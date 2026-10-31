@@ -1,0 +1,117 @@
+# Production moves only here, by hand. Pick a Tests run on main whose deploy-staging job went
+# green; this workflow checks that run (scripts/deploy/promotion.mjs), then waits for the
+# production environment's required reviewer before it deploys the same two image digests that
+# staging is running. Nothing is rebuilt. Rolling back is the same thing with an older run.
+#
+# The deploy uses deploy/ and scripts/deploy/ as they were at the promoted commit, so production
+# gets the configuration that went through staging along with the images.
+# docs/BRINDLE_DEPLOY.md has the walk-through.
+name: Promote to production
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Tests run ID on main whose staging deploy succeeded (the number in its URL)
+        required: true
+        type: string
+      bootstrap:
+        description: First deploy of a fresh instance only, turns INVITE_ONLY off so the owner can sign up
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+# One production deploy at a time, and never cut one off.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 22
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main' && github.repository == 'BrindleHQ/openGym'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.check.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/deploy
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: release
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: The run is a green push to main that reached staging
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: node scripts/deploy/promotion.mjs "$RUN_ID" release.json
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: release
+          path: release.json
+          retention-days: 90
+          if-no-files-found: error
+      - name: Summary
+        env:
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          {
+            echo "### Candidate for production (from run ${RUN_ID})"
+            echo '```json'; cat release.json; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  production:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://opengym.brindle.co
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.verify.outputs.sha }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: release
+      - name: Deploy and verify production
+        env:
+          COOLIFY_URL: ${{ vars.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_SERVICE_UUID: ${{ vars.COOLIFY_SERVICE_UUID }}
+          BOOTSTRAP: ${{ inputs.bootstrap }}
+        run: |
+          if [ "$BOOTSTRAP" = true ]; then set -- --bootstrap; fi
+          node scripts/deploy/coolify.mjs deploy production release.json "$@"
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Production"
+            if [ -f deployment-result.json ]; then echo '```json'; cat deployment-result.json; echo '```'
+            else echo "Deploy did not finish; the log above says where it stopped. Container logs are in Coolify (project openGym, production)."; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: always()
+        with:
+          name: production-deployment
+          path: deployment-result.json
+          retention-days: 90
+          if-no-files-found: ignore

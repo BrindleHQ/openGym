@@ -1,0 +1,18 @@
+{
+  "staging": {
+    "host": "opengym-staging.brindle.to",
+    "rpName": "openGym (staging)",
+    "inviteOnly": true,
+    "allowGuest": false,
+    "backupCron": "17 3 * * *",
+    "backupRetentionDays": 7
+  },
+  "production": {
+    "host": "opengym.brindle.co",
+    "rpName": "openGym",
+    "inviteOnly": true,
+    "allowGuest": false,
+    "backupCron": "47 2 * * *",
+    "backupRetentionDays": 30
+  }
+}

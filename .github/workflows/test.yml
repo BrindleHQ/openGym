@@ -1,12 +1,15 @@
-# The check every change goes through: pull requests, main, the release branches (stores,
-# watch) and ci-* branches. One workflow, one result: the last job, `tests-ok`, is the one to
-# mark as required in a ruleset. It is green when every job that had something to check passed;
+# The check every change goes through: pull requests, main and ci-* branches. One workflow, one
+# result: `tests-ok` is the check the main ruleset requires. It is green when every job that had something to check passed;
 # jobs with nothing to check (a docs-only change) are skipped, not red, so a required check
 # never hangs waiting for a run that a path filter swallowed.
 #
 # What runs is decided per job by the `changes` job (dorny/paths-filter), not by a workflow
 # level `paths:`. That way the workflow always reports, and a change to api/ alone does not
 # spend four minutes building the frontend.
+#
+# A push to main that passes goes on to `publish` (images by digest) and `deploy-staging`;
+# production is promote.yml, by hand, behind the production environment's approval
+# (docs/BRINDLE_DEPLOY.md). Pull requests never reach those jobs or their secrets.
 #
 # Every run writes its numbers (tests and coverage per app area, slowest tests, runtime) to the
 # job summary through scripts/ci/test-report.mjs and keeps them as the `test-stats` artifact.
@@ -15,16 +18,17 @@ name: Tests
 on:
   pull_request:
   push:
-    branches: [main, stores, watch, 'ci-*']
+    branches: [main, 'ci-*']
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  # One run per PR or branch; a newer push makes the older run pointless.
+  # One run per PR or branch. A newer push cancels an older pull-request run, but never a branch
+  # run: that one may be deploying, and a deploy cut off halfway helps nobody. Branch runs queue.
   group: tests-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # The images are node:22-alpine (web/Dockerfile, api/Dockerfile): CI matches production.
@@ -43,7 +47,7 @@ jobs:
       api: ${{ steps.f.outputs.api == 'true' || github.event_name == 'workflow_dispatch' }}
       mcp: ${{ steps.f.outputs.mcp == 'true' || github.event_name == 'workflow_dispatch' }}
       images: ${{ steps.f.outputs.images == 'true' || github.event_name == 'workflow_dispatch' }}
-      android: ${{ steps.f.outputs.android == 'true' || github.event_name == 'workflow_dispatch' }}
+      deploy: ${{ steps.f.outputs.deploy == 'true' || github.event_name == 'workflow_dispatch' }}
       catalogue: ${{ steps.f.outputs.catalogue == 'true' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -101,14 +105,11 @@ jobs:
               - 'web/**'
               - 'frontend/package*.json'
               - 'frontend/vite.config.js'
-            android:
+            deploy:
               - '.github/workflows/test.yml'
-              - 'frontend/android/**'
-              - 'frontend/package*.json'
-              - 'frontend/capacitor.config.json'
-              - 'frontend/scripts/check-mobile-bundle.mjs'
-              - 'scripts/android/**'
-              - 'scripts/catalogue/stage-media.mjs'
+              - '.github/workflows/promote.yml'
+              - 'deploy/**'
+              - 'scripts/deploy/**'
             catalogue:
               - '.github/workflows/test.yml'
               - 'catalogue/**'
@@ -416,14 +417,13 @@ jobs:
           # including the fixture provider.
           docker run --rm opengym-api:default id coach
 
-  # The Android app compiles, its JVM unit tests pass, and the phone bundle inside it is the
-  # mobile flavour (check-mobile-bundle runs inside build:mobile). Debug and unsigned: signing
-  # is the release machine's job (scripts/android/build-release.sh).
-  android:
+  # The deploy tooling: unit tests for scripts/deploy, and both environments' Coolify compose
+  # rendered from a dummy release and checked by compose itself.
+  deploy-config:
     needs: changes
-    if: needs.changes.outputs.android == 'true'
+    if: needs.changes.outputs.deploy == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -431,37 +431,38 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
-        with:
-          distribution: temurin
-          java-version: 21
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
-        with:
-          # Only main and stores write the Gradle cache; other branches and PRs read it.
-          cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/stores' }}
-          add-job-summary: on-failure
-      - run: npm ci --ignore-scripts --no-audit --no-fund
-        working-directory: frontend
-      - name: Phone bundle + cap sync
-        run: npm run build:mobile
-        working-directory: frontend
-      - name: JVM unit tests, sideload APK, play flavour compiles
-        working-directory: frontend/android
-        run: ./gradlew --no-daemon testSideloadDebugUnitTest assembleSideloadDebug compilePlayDebugJavaWithJavac
-      - name: Stats
-        if: always()
-        working-directory: frontend/android
+      - run: node --test "scripts/deploy/*.test.mjs"
+      - name: Both environments render to a valid compose file
         run: |
-          {
-            echo "### Android"
-            for a in app/build/outputs/apk/sideload/debug/*.apk; do
-              [ -f "$a" ] && echo "- debug sideload APK: $(numfmt --to=iec "$(stat -c %s "$a")") ($(basename "$a"))"
-            done
-            cat app/build/test-results/testSideloadDebugUnitTest/*.xml 2>/dev/null \
-              | grep -o '<testsuite [^>]*' | sed -E 's/.*name="([^"]*)".*tests="([0-9]+)".*failures="([0-9]+)".*/- JVM: \1: \2 tests, \3 failed/' || true
-          } >> "$GITHUB_STEP_SUMMARY"
+          d=$(head -c 64 /dev/zero | tr '\0' a)
+          printf '{"sha":"%s","api":"ghcr.io/brindlehq/opengym-api@sha256:%s","web":"ghcr.io/brindlehq/opengym-web@sha256:%s"}' \
+            "$(head -c 40 /dev/zero | tr '\0' 0)" "$d" "$d" > dummy-release.json
+          for env in staging production; do
+            node scripts/deploy/coolify.mjs render "$env" dummy-release.json > "compose-$env.yml"
+            docker compose -f "compose-$env.yml" config -q
+            echo "$env: ok"
+          done
+
+  # What our two images ship has no high or critical advisory: the web bundle's and the API's
+  # runtime dependencies, without the optional Coach SDK, which the image we deploy leaves out
+  # (npm ci --omit=optional in api/Dockerfile). The weekly audit.yml checks the wider picture,
+  # dev tooling, the Coach SDK and mcp/ included, on its own schedule outside this gate.
+  deps-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: api runtime (as in the image)
+        working-directory: api
+        run: npm audit --omit=dev --omit=optional --audit-level=high
+      - name: web bundle runtime
+        working-directory: frontend
+        run: npm audit --omit=dev --omit=optional --audit-level=high
 
   # One summary of the numbers of every suite that ran.
   report:
@@ -494,7 +495,7 @@ jobs:
   # The single required check. Green when every job that ran passed and the others were
   # skipped because nothing they check changed.
   tests-ok:
-    needs: [changes, frontend, api, mcp, catalogue, images, android]
+    needs: [changes, frontend, api, mcp, catalogue, images, deploy-config, deps-audit]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -508,3 +509,147 @@ jobs:
             for (const [k, v] of Object.entries(n)) console.log(k.padEnd(10), v.result)
             const bad = Object.entries(n).filter(([, v]) => !["success", "skipped"].includes(v.result))
             if (bad.length) { console.log("::error::" + bad.map(([k, v]) => k + ": " + v.result).join(", ")); process.exit(1) }'
+
+  # The release candidate: built once from this commit after tests-ok, pushed to GHCR, then
+  # pulled back by digest and smoke-tested. release.json names the two images by digest; every
+  # later step (staging, production, rollback) deploys exactly those, nothing is rebuilt.
+  # Pushes to this repository only: a pull request, or a fork, never gets here.
+  publish:
+    needs: tests-ok
+    if: >-
+      github.event_name == 'push' && github.repository == 'BrindleHQ/openGym' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/ci-'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Version metadata
+        id: v
+        run: |
+          echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      # The source label is what links the package to this repository on GHCR (and overrides the
+      # upstream one in the Dockerfiles). Untargeted on purpose: the last stage is the image
+      # without any AI runtime, the one the images job checks.
+      - name: api
+        id: api
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ./api
+          push: true
+          platforms: linux/amd64
+          provenance: mode=max
+          sbom: true
+          tags: ghcr.io/brindlehq/opengym-api:sha-${{ github.sha }}
+          build-args: |
+            VERSION=sha-${{ steps.v.outputs.short }}
+            VCS_REF=${{ github.sha }}
+            BUILD_DATE=${{ steps.v.outputs.created }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/BrindleHQ/openGym
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=ci-api
+      - name: web
+        id: web
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ./web/Dockerfile
+          push: true
+          platforms: linux/amd64
+          provenance: mode=max
+          sbom: true
+          tags: ghcr.io/brindlehq/opengym-web:sha-${{ github.sha }}
+          build-args: |
+            APP_BUILD=${{ steps.v.outputs.short }}
+            VERSION=sha-${{ steps.v.outputs.short }}
+            VCS_REF=${{ github.sha }}
+            BUILD_DATE=${{ steps.v.outputs.created }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/BrindleHQ/openGym
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=ci-web
+      - name: Release record
+        env:
+          API_DIGEST: ${{ steps.api.outputs.digest }}
+          WEB_DIGEST: ${{ steps.web.outputs.digest }}
+        run: |
+          node -e '
+            const e = process.env
+            const r = { sha: e.GITHUB_SHA, api: "ghcr.io/brindlehq/opengym-api@" + e.API_DIGEST,
+              web: "ghcr.io/brindlehq/opengym-web@" + e.WEB_DIGEST, run_id: e.GITHUB_RUN_ID,
+              run_attempt: e.GITHUB_RUN_ATTEMPT, ref: e.GITHUB_REF, built: new Date().toISOString() }
+            require("fs").writeFileSync("release.json", JSON.stringify(r, null, 2) + "\n")
+            console.log(JSON.stringify(r, null, 2))'
+      - name: Smoke-test the pushed images by digest
+        run: scripts/deploy/smoke.sh release.json
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: release
+          path: release.json
+          retention-days: 90
+          if-no-files-found: error
+      - name: Summary
+        run: |
+          {
+            echo "### Release candidate ${GITHUB_SHA::7}"
+            echo '```json'; cat release.json; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Every green push to main lands on staging. One staging deploy at a time; a newer one waits
+  # for the running one rather than cutting it off. The token is the staging environment's own
+  # secret, which only main may use (environment branch policy).
+  deploy-staging:
+    needs: publish
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: staging
+      url: https://opengym-staging.brindle.to
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: release
+      - name: Deploy and verify staging
+        env:
+          COOLIFY_URL: ${{ vars.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_SERVICE_UUID: ${{ vars.COOLIFY_SERVICE_UUID }}
+        run: node scripts/deploy/coolify.mjs deploy staging release.json
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Staging"
+            if [ -f deployment-result.json ]; then echo '```json'; cat deployment-result.json; echo '```'
+            else echo "Deploy did not finish; the log above says where it stopped. Container logs are in Coolify (project openGym, staging)."; fi
+            echo "Promote this run to production: Actions, Promote to production, run_id ${GITHUB_RUN_ID}"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: always()
+        with:
+          name: staging-deployment
+          path: deployment-result.json
+          retention-days: 90
+          if-no-files-found: ignore
