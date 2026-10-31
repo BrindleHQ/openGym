@@ -34,7 +34,9 @@ jobs:
         if: matrix.env != 'production' || vars.PRODUCTION_LIVE == 'true'
         env:
           ENV_NAME: ${{ matrix.env }}
-        run: node scripts/deploy/coolify.mjs describe "$ENV_NAME" | tee -a "$GITHUB_OUTPUT"
+        run: |
+          set -o pipefail
+          node scripts/deploy/coolify.mjs describe "$ENV_NAME" | tee -a "$GITHUB_OUTPUT"
       - uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
         if: steps.where.outputs.exposure == 'tailnet'
         with:

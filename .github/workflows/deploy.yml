@@ -65,7 +65,9 @@ jobs:
             || { echo "::error::release.json is for $(jq -r .sha release.json), not $WANT"; exit 1; }
       - name: Where ${{ inputs.environment }} answers (exposure in deploy/environments.json)
         id: where
-        run: node scripts/deploy/coolify.mjs describe "$ENV_NAME" | tee -a "$GITHUB_OUTPUT"
+        run: |
+          set -o pipefail
+          node scripts/deploy/coolify.mjs describe "$ENV_NAME" | tee -a "$GITHUB_OUTPUT"
       # Boop Beep's SSH is reachable only on the tailnet: join it as an ephemeral tag:ci node.
       - uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
         with:
@@ -77,6 +79,8 @@ jobs:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           BOOP_BEEP_KNOWN_HOSTS: ${{ vars.BOOP_BEEP_KNOWN_HOSTS }}
         run: |
+          # Without pipefail the step's status is tee's, and a failed deploy would look green.
+          set -o pipefail
           if [ "$BOOTSTRAP" = true ]; then set -- --bootstrap; fi
           jq -c '{sha, api, web, run_id}' release.json \
             | scripts/deploy/ssh-release.sh deploy "$ENV_NAME" "$@" | tee deploy.jsonl

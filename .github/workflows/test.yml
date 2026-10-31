@@ -433,6 +433,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: node --test "scripts/deploy/*.test.mjs"
+      - name: The deploy scripts parse and pass shellcheck
+        run: shellcheck -S warning deploy/*.sh scripts/deploy/*.sh
       - name: Both environments render to a valid compose file
         run: |
           d=$(head -c 64 /dev/zero | tr '\0' a)

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Runs one opengym-release command on Boop Beep from a deploy job, over the tailnet, with the
 # environment's own key: that key can do nothing but `opengym-release <cmd> <env>` there
-# (deploy/host-setup.sh). stdin is passed through (a deploy reads its plan from it). Prints the
+# (deploy/host-setup.sh). stdin is passed through (a deploy reads the release from it). Prints the
 # tool's JSON lines and exits non-zero unless the last one says "ok": true.
 #
-#   DEPLOY_SSH_KEY=... BOOP_BEEP_KNOWN_HOSTS=... scripts/deploy/ssh-release.sh deploy staging < plan.json
+#   DEPLOY_SSH_KEY=... BOOP_BEEP_KNOWN_HOSTS=... scripts/deploy/ssh-release.sh deploy staging < release.json
 set -euo pipefail
-: "${DEPLOY_SSH_KEY:?the environment's DEPLOY_SSH_KEY secret}"
+: "${DEPLOY_SSH_KEY:?set DEPLOY_SSH_KEY, the environment secret}"
 : "${BOOP_BEEP_KNOWN_HOSTS:?the BOOP_BEEP_KNOWN_HOSTS variable (pinned host key)}"
 host=${BOOP_BEEP_HOST:-boop-beep.tail5728d8.ts.net}
 
