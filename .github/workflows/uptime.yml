@@ -1,0 +1,41 @@
+# An outside view of the deployed instances: every 30 minutes, through Cloudflare, the way a
+# phone sees them. A failed run is GitHub's own notification to whoever owns the schedule.
+# Production joins once the repository variable PRODUCTION_LIVE is "true" (after the cutover in
+# docs/BRINDLE_DEPLOY.md). Inside Boop Beep, Coolify restarts an unhealthy container on its own.
+name: Uptime
+
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    if: github.repository == 'BrindleHQ/openGym'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - env: staging
+            host: opengym-staging.brindle.to
+          - env: production
+            host: opengym.brindle.co
+    steps:
+      - name: ${{ matrix.env }} answers and can write its data
+        if: matrix.env != 'production' || vars.PRODUCTION_LIVE == 'true'
+        env:
+          HOST: ${{ matrix.host }}
+        run: |
+          for _ in 1 2 3; do
+            if body=$(curl -fsS -m 15 "https://$HOST/api/health"); then break; fi
+            body=""; sleep 20
+          done
+          echo "health: ${body:-no answer}"
+          echo "$body" | grep -q '"writable":true' || { echo "::error::https://$HOST is down or cannot write its data"; exit 1; }
+          rev=$(curl -fsS -m 15 "https://$HOST/release.json?t=$(date +%s)" | sed -E 's/.*"revision":"([0-9a-f]+)".*/\1/')
+          echo "### ${{ matrix.env }}: up, serving ${rev:-unknown}" >> "$GITHUB_STEP_SUMMARY"
