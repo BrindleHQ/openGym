@@ -105,11 +105,13 @@ uid 10001, the user the api container runs as (`deploy/coolify-compose.yml`). Ea
    and boots them together (the `images` job). `tests-ok` is the required check.
 2. You merge. On `main`, `publish` builds the images once, pushes them to GHCR and smoke-tests them
    by digest (`scripts/deploy/smoke.sh`). It records the two digests in `release.json`.
-3. `deploy-staging` runs `scripts/deploy/coolify.mjs deploy staging release.json`. The script
-   fills in `deploy/coolify-compose.yml` for staging and uploads it to Coolify. Then it waits
-   until staging's address (`https://boop-beep.tail5728d8.ts.net:9443`) serves `release.json` with
-   the new commit.
-4. `promote.yml`, after approval, deploys the same digests to production.
+3. `deploy-staging` (`.github/workflows/deploy.yml`) renders a plan for staging
+   (`scripts/deploy/coolify.mjs plan`: `deploy/coolify-compose.yml` filled in, plus what the
+   release must show when live) and sends it over the tailnet to `opengym-release` on Boop Beep.
+   The tool has Coolify start it, waits for the new containers to serve the new commit at
+   `https://boop-beep.tail5728d8.ts.net:9443`, and keeps a snapshot for rollback.
+4. `deploy-production` does the same for production, right after staging took the release.
+   `ssh boop-beep sudo opengym-release rollback production` goes back in about 4 seconds.
 
 To watch a single push happen, open the browser's network tab while you finish a workout on
 staging. One `PUT /api/data` appears about 1.5 seconds later, and its response carries the new

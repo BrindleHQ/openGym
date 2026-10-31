@@ -14,10 +14,10 @@ only our deployment.
 | Public address, if switched | none | `https://opengym-staging.brindle.to` | `https://opengym.brindle.to` |
 | Data | `./data` in your checkout | `/srv/opengym/staging/data` | `/srv/opengym/production/data` |
 | Backups | none | `/srv/opengym/staging/backups`, nightly 03:17 UTC, 7 days | `/srv/opengym/production/backups`, nightly 02:47 UTC, 30 days |
-| Deployed by | you, by hand | every green push to `main`, automatically | `Promote to production`, by hand, with approval |
+| Deployed by | you, by hand | every green push to `main`, automatically | right after staging, automatically |
 | Coolify service | none | `opengym-staging` | `opengym-production` |
 
-No two environments share data, hostname, Coolify service, GitHub environment or token.
+No two environments share data, address, Coolify service, GitHub environment or deploy key.
 openGym keeps its own secrets in its data directory: the session key (`secret`) and the push keys
 (`vapid.json`). So each environment's secrets live only in that environment's directory.
 
@@ -72,72 +72,83 @@ It passes when every job that had something to check passed:
 - the deploy tooling (`deploy-config`);
 - the runtime dependency audit (`deps-audit`).
 
-Merge when it is green. Nothing else is needed: staging follows.
+Merge when it is green. Nothing else is needed: staging, then production, follow.
 
-## Release and promotion
+## Releases, deploys and rollback
+
+The model is the one T3 Code, Cloudflare Workers, Vercel and Kamal use: every release is an
+immutable build, `main` is what runs, earlier releases stay on hand, and a rollback is a switch
+back to one of them, run directly against the host, not through CI.
 
 ```
 pull request ──> Tests (tests-ok)
-merge to main ─> Tests ─> publish ──────────> deploy-staging ──────> (you) Promote to production
-                          build once, push      same digests,          approve, same digests,
-                          to GHCR, smoke-test   verify staging         verify production
-                          by digest
+merge to main ─> Tests ─> publish ─────────────> deploy-staging ──> deploy-production
+                          build once, push to     same release        same release, if staging
+                          GHCR, smoke-test by                         took it
+                          digest
+rollback ────────> ssh boop-beep sudo opengym-release rollback production     (about 4 s)
 ```
 
-1. **publish** (in `test.yml`, only after `tests-ok`, only for pushes to this repository) builds
-   `ghcr.io/brindlehq/opengym-api` and `opengym-web`, tagged `sha-<commit>`. It pulls them back
-   by digest and runs `scripts/deploy/smoke.sh`, then saves `release.json` (the commit and both
-   digests) as the run's `release` artifact for 90 days.
-2. **deploy-staging** runs `scripts/deploy/coolify.mjs deploy staging release.json`. The script:
-   - renders `deploy/coolify-compose.yml` with the values from `deploy/environments.json`;
-   - uploads the result to the `opengym-staging` Coolify service and deploys it;
-   - waits until the containers report healthy and run the recorded digests;
-   - waits until `<address>/release.json` names the new commit,
-     `/api/health` says the data directory is writable, and `/api/config` shows the rendered
-     `invite_only` and `allow_guest`. Until Coolify restarts the containers, the old ones keep
-     answering, so checking health alone could pass too early.
+- **A release** is one green commit on `main`: `publish` builds `ghcr.io/brindlehq/opengym-api`
+  and `opengym-web` once, pulls them back by digest, runs `scripts/deploy/smoke.sh`, and saves
+  `release.json` (the commit and both digests) as the run's `release` artifact for 90 days.
+  Nothing is rebuilt after that.
+- **A deploy** (`.github/workflows/deploy.yml`, for staging and then production) renders a plan
+  from the release's own commit (`scripts/deploy/coolify.mjs plan`: the compose for the
+  environment, its settings and what it must show when live), joins the tailnet, and sends the
+  plan over SSH to **`opengym-release`** on Boop Beep with the environment's own key. That key can
+  run `opengym-release` for its environment and nothing else. The job then checks the address
+  from outside (`coolify.mjs verify`).
+- **`opengym-release`** (`deploy/opengym-release.sh`, installed by `host-setup.sh`) does the
+  deploy on the host:
+  - one operation per environment at a time (a lock: a second deploy waits);
+  - it uploads the compose to the environment's Coolify service, has Coolify start it, and waits
+    for Coolify's own record of that run. Coolify does not queue compose deploys or report their
+    end over its API, and two overlapping runs once took staging down for five minutes;
+  - the new release must then be healthy and serve its commit (`release.json`) with the planned
+    `invite_only` and `allow_guest`. If not, it **restores the release that was live** and fails;
+  - it keeps what Coolify generated as the release's snapshot: the last 10 per environment, in
+    `/srv/opengym/<env>/releases/`.
+- **A rollback** starts a kept snapshot directly with docker compose. Nothing is built, pulled
+  or queued, and Coolify is told afterwards. Measured on staging: **3.9 s** on the host, 4.2 s
+  from Devbox, with the site unavailable for 3.5 s.
 
-   The run summary shows the result and the run ID to promote.
-3. **Promote to production** (`promote.yml`): Actions, then **Promote to production**, then
-   **Run workflow**, with `run_id` set to that Tests run's ID. The `verify` job refuses anything
-   that is not:
-   - a green push to `main` in BrindleHQ/openGym,
-   - with a successful `deploy-staging` job,
-   - whose `release.json` names the same commit.
+openGym's API keeps its data in memory and in files, so two copies may never run at once. That
+is why there is no Kamal-style overlap: the old containers stop, then the new ones start. A
+deploy or rollback is unavailable for about 3 to 4 seconds, and the apps keep their changes and
+sync when it is back.
 
-   The `production` job then waits for the environment's required reviewer. Once approved, it
-   checks out the promoted commit and deploys the same two digests with that commit's
-   `deploy/` configuration.
+### Commands (for you or an agent)
 
-Nothing is rebuilt between staging and production. One deploy per environment runs at a time
-(`deploy-staging` and `deploy-production` concurrency groups). A second deploy waits and is never
-cut off halfway.
+Every line `opengym-release` prints is one JSON object, and the last has `"ok": true` or `false`.
 
-A deploy or restart takes the address offline for about 30 to 60 seconds: Coolify stops the
-containers before it starts the new ones, and Traefik answers `404` in between. Two copies of the
-API cannot run at once on the same data directory, so this gap can't be removed without changing
-how openGym stores data. The apps keep their changes and sync once the server is back. Deploy
-production when nobody is mid-workout.
+```bash
+ssh boop-beep sudo opengym-release status production       # what is live, and what it serves
+ssh boop-beep sudo opengym-release history production      # the kept releases, newest first
+ssh boop-beep sudo opengym-release rollback production     # back to the release before the live one
+ssh boop-beep sudo opengym-release rollback production 20261031T195648Z-28a6f29   # or a named one
+# deploy a release by hand (CI does this): a plan on stdin
+node scripts/deploy/coolify.mjs plan production release.json | ssh boop-beep sudo opengym-release deploy production
+```
 
-### Rolling back
+A rollback needs no approval: it only goes back to a release production has already run. The
+next merge to `main` deploys forward again. To keep a rollback, revert the change on `main`.
 
-- **Production:** run **Promote to production** with the `run_id` of an earlier Tests run that
-  reached staging. It deploys that release's digests and configuration.
-- **Staging:** open the earlier Tests run on `main` and re-run its `deploy-staging` job.
-- **Older than 90 days** (the release artifact has expired): the images are still in GHCR as
-  `sha-<commit>`. Write a `release.json` by hand with the digests from
-  `docker buildx imagetools inspect ghcr.io/brindlehq/opengym-api:sha-<commit>`, and run
-  `scripts/deploy/coolify.mjs deploy <env> release.json` with the environment's Coolify token.
+For a release older than the ten kept on the host, run **Deploy an earlier release**
+(`promote.yml`) with the `run_id` of its Tests run (artifacts last 90 days). Older still, the
+images are in GHCR as `sha-<commit>`: write a `release.json` with the digests from
+`docker buildx imagetools inspect ghcr.io/brindlehq/opengym-api:sha-<commit>` and deploy it by
+hand as above.
 
-**An image rollback does not roll back data.** openGym has no schema migrations: the profile is
-one JSON document per user, and older code ignores fields it does not know. So a server image can
-go back safely. Two things do not go back:
+**A rollback does not roll back data.** openGym has no schema migrations: the profile is one JSON
+document per user, and older code ignores fields it does not know. So a server image can go back
+safely. Two things do not go back:
 
 - Data written by a newer app version stays as it was written.
 - The iPhone app has its UI built in. Deploying the server never changes the app on a phone.
 
 If a release damaged data, restore a backup instead (below). That also discards every change
-made since the backup, on every device that has not synced yet. Prefer the image rollback, and
+made since the backup, on every device that has not synced yet. Prefer the rollback, and
 restore only when the data itself is wrong.
 
 ## Backups and restore
@@ -188,12 +199,14 @@ off-site, encrypted target is a decision for the owner (see the open items in th
 
 - **Healthchecks.** `api` checks `/api/health`, which writes a probe file into the data
   directory, so a full disk or a read-only mount shows as unhealthy. `web` checks
-  `/api/health` through nginx, so it proves the proxy as well. Both check every 30 seconds.
+  `/api/health` through nginx, so it proves the proxy as well. Both check every second while a
+  container starts (so deploys and rollbacks see it healthy at once), then every 30 seconds. The
+  API runs under an init process, so it stops at once instead of waiting out Docker's 10 s.
   `restart: unless-stopped` brings a crashed container back.
 - **Logs.** Coolify, project openGym, the service, then **Logs** for each container. The
   containers' own logs rotate at 5 files of 10 MB each. A failed deploy job prints the container
-  states and where it stopped. Container logs stay in Coolify, because Actions logs in this
-  public repository are public.
+  `opengym-release` lines and where it stopped. Container logs stay in Coolify, because Actions
+  logs in this public repository are public.
 - **Monitoring.** `uptime.yml` checks both addresses from outside Boop Beep every 30 minutes
   (joining the tailnet for a tailnet environment), and a
   failure notifies you through GitHub. Production joins once the repository variable
@@ -204,21 +217,20 @@ off-site, encrypted target is a decision for the owner (see the open items in th
 ## Production cutover (not done yet)
 
 Production is prepared but has never run: the `opengym-production` service exists in Coolify
-with placeholder images and is stopped, and `/srv/opengym/production/{data,backups}` exist and
-are empty. To bring it up:
+and is stopped, and `/srv/opengym/production/{data,backups}` exist and are empty. To bring it up:
 
-1. Make sure the Tailscale OAuth client exists (One-time setup, step 4). Without it the deploy
-   jobs cannot reach a tailnet environment to check it.
-2. Merge to `main`, and wait for the Tests run to deploy staging.
-3. Run **Promote to production** with that run's ID and **bootstrap** ticked. Approve it.
-4. With Tailscale on, open <https://boop-beep.tail5728d8.ts.net:8443> at once and create the
+1. Merge to `main`. The Tests run deploys staging, then production. Production comes up
+   invite-only with no profiles yet.
+2. Open signup once: **Deploy an earlier release**, environment `production`, the `run_id` of
+   that Tests run, **bootstrap** ticked.
+3. With Tailscale on, open <https://boop-beep.tail5728d8.ts.net:8443> at once and create the
    owner profile. The first profile becomes the admin.
-5. Run **Promote to production** again, same run ID, bootstrap off, so the instance is
-   invite-only again. Check that `<address>/api/config` shows `"invite_only":true`.
-6. Pair the iPhone app: on the website, Settings, Account, Pair the mobile app. In the app, enter
+4. Close signup: `ssh boop-beep sudo opengym-release rollback production` (back to the
+   invite-only release), and check that `<address>/api/config` shows `"invite_only":true`.
+5. Pair the iPhone app: on the website, Settings, Account, Pair the mobile app. In the app, enter
    the server address `https://boop-beep.tail5728d8.ts.net:8443` and the code. Tailscale has to
    be on on the phone for it to sync.
-7. Set the repository variable `PRODUCTION_LIVE` to `true` (uptime checks), and run
+6. Set the repository variable `PRODUCTION_LIVE` to `true` (uptime checks), and run
    `sudo deploy/restore-test.sh production` once the first nightly archive exists.
 
 ## Passkeys and hostnames
@@ -232,10 +244,10 @@ cookie (`SESSION_COOKIE=gymsid-<env>` in the compose file); you can be signed in
 browser. Changing an environment's address later locks every account out of it.
 
 Both environments start invite-only (`inviteOnly: true`, guests off). A fresh instance has no
-admin to issue the first invite, so its first deploy uses `--bootstrap`. The `bootstrap` input of
-Promote to production does the same. That deploy turns `INVITE_ONLY` off, and the first profile
-created becomes the admin (`FIRST_USER_ADMIN=1`). Create the owner profile at once, then deploy
-again without bootstrap.
+admin to issue the first invite, so it needs one release deployed with `--bootstrap` (the
+`bootstrap` input of Deploy an earlier release). That deploy turns `INVITE_ONLY` off, and the first profile
+created becomes the admin (`FIRST_USER_ADMIN=1`). Create the owner profile at once, then roll back
+to the release before it.
 
 ## Security boundaries
 
@@ -244,17 +256,18 @@ again without bootstrap.
   Fork pull requests from outside contributors need approval before they run.
 - No `pull_request_target` workflow remains. The org's self-hosted runners, two of which run on
   Boop Beep, are not used here, and their runner group does not allow public repositories.
-- Each Coolify token is stored only in its GitHub environment (`staging` or `production`). The
-  token for `staging` can be used only from `main`. The token for `production` can be used only
-  from `main`, after the required reviewer approves.
-
-  Coolify scopes tokens to a team, not to a service. So either token could change both services.
-  The deploy script refuses to deploy to a service whose name is not `opengym-<env>`.
+- GitHub holds no Coolify token. Each environment has an SSH key (`DEPLOY_SSH_KEY`, an
+  environment secret usable from `main` only) for the user `opengym-deploy` on Boop Beep, whose
+  forced command runs `opengym-release --ssh <env>`: the staging key cannot touch production,
+  and neither can run anything else (`deploy/host-setup.sh`). The host key is pinned
+  (`BOOP_BEEP_KNOWN_HOSTS`). The only Coolify token is in `/etc/opengym/coolify-token`, root only.
+- `opengym-release` is installed by hand from a reviewed checkout (`host-setup.sh`), so a commit
+  cannot change what runs as root on the host.
 - Both environments are tailnet-only: no Coolify domain, no tunnel route, the web container bound
   to `127.0.0.1` on Boop Beep, and `tailscale serve` (never Funnel) in front. The deploy and uptime
   jobs join the tailnet as ephemeral `tag:ci` nodes with an OAuth client
   (`TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, repository secrets, never given to fork pull requests).
-  The tailnet policy should let `tag:ci` reach only ports 8443 and 9443 on Boop Beep.
+  The tailnet policy should let `tag:ci` reach only ports 22, 8443 and 9443 on Boop Beep.
 - The GHCR packages are private. The web image carries the Gym visual exercise media, which are
   licensed for use within openGym only (NOTICE.md). Root on Boop Beep is logged in to `ghcr.io`
   to pull them.
@@ -272,26 +285,31 @@ from Gym visual, or remove the media.
 
 ## One-time setup (already done; redo only to rebuild)
 
-1. On Boop Beep, from a checkout: `sudo deploy/host-setup.sh staging production`. It creates the
-   data and backup directories and the `tailscale serve` HTTPS endpoints.
+1. On Boop Beep, from a checkout of `main`: `sudo deploy/host-setup.sh staging production`
+   (always both: it rewrites the deploy keys and sudo rules). It creates the data and backup
+   directories, the `tailscale serve` endpoints, the release tool and the `opengym-deploy` user.
+   Before the first run, put a Coolify token (read, write, deploy) in `/etc/opengym/coolify-token`
+   and each environment's deploy public key in `/etc/opengym/deploy-<env>.pub`. Rerun it whenever
+   `deploy/opengym-release.sh` changes.
 2. In Coolify: project **openGym** with environments `staging` and `production`. Create the
    services with `scripts/deploy/coolify.mjs provision <env> release.json` (any valid record;
-   the first deploy replaces the images). Use a Coolify token with read, write and deploy. It
-   needs `COOLIFY_PROJECT_UUID` and `COOLIFY_SERVER_UUID`.
+   the first deploy replaces the images; it needs `COOLIFY_URL`, `COOLIFY_TOKEN`,
+   `COOLIFY_PROJECT_UUID` and `COOLIFY_SERVER_UUID`), and write each service's UUID to
+   `/srv/opengym/<env>/service-uuid`.
 3. In GitHub:
-   - the repository variable `COOLIFY_URL`;
-   - environments `staging` (deployment branches: `main`) and `production` (deployment
-     branches: `main`, required reviewer);
-   - in each environment, the variable `COOLIFY_SERVICE_UUID` and the secret `COOLIFY_TOKEN`
-     (one token per environment);
+   - environments `staging` and `production`, deployment branches `main` only, each with the
+     secret `DEPLOY_SSH_KEY` (the private half of its deploy key);
+   - the repository variable `BOOP_BEEP_KNOWN_HOSTS` (`ssh-keyscan -t ed25519
+     boop-beep.tail5728d8.ts.net`, checked against the host's own fingerprint);
    - a ruleset on `main` that requires a pull request and the `tests-ok` check.
 4. In Tailscale (admin console):
    - in the policy file, `"tagOwners": {"tag:ci": ["autogroup:admin"]}` and a grant that lets
-     `tag:ci` reach only Boop Beep's openGym ports, for example
-     `{"src": ["tag:ci"], "dst": ["100.108.36.43"], "ip": ["tcp:8443", "tcp:9443"]}`. If the policy
-     still has the default allow-all rule, tighten it, or `tag:ci` can reach everything for the
-     minutes a job runs;
-   - Settings, OAuth clients, a client with the **Auth Keys** write scope and the tag `tag:ci`;
+     `tag:ci` reach only what CI needs on Boop Beep:
+     `{"src": ["tag:ci"], "dst": ["100.108.36.43"], "ip": ["tcp:22", "tcp:8443", "tcp:9443"]}`.
+     If the policy still has the default allow-all rule, tighten it, or `tag:ci` can reach
+     everything for the minutes a job runs;
+   - Settings, Trust credentials, an OAuth client with the **Auth Keys** write scope and the tag
+     `tag:ci`;
    - its ID and secret as repository secrets `TS_OAUTH_CLIENT_ID` and `TS_OAUTH_SECRET`.
 
 ## Syncing with upstream
