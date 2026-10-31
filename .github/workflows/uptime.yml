@@ -1,0 +1,58 @@
+# A view of the deployed instances from outside Boop Beep every 30 minutes, the way a phone sees
+# them: through the tailnet or through Cloudflare, whichever `exposure` the environment has. A failed run is GitHub's own notification to whoever owns the schedule.
+# Production joins once the repository variable PRODUCTION_LIVE is "true" (after the cutover in
+# docs/BRINDLE_DEPLOY.md). Inside Boop Beep, Coolify restarts an unhealthy container on its own.
+name: Uptime
+
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    if: github.repository == 'BrindleHQ/openGym'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [staging, production]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: matrix.env != 'production' || vars.PRODUCTION_LIVE == 'true'
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            deploy
+            scripts/deploy
+      - name: Where ${{ matrix.env }} answers
+        id: where
+        if: matrix.env != 'production' || vars.PRODUCTION_LIVE == 'true'
+        env:
+          ENV_NAME: ${{ matrix.env }}
+        run: |
+          set -o pipefail
+          node scripts/deploy/coolify.mjs describe "$ENV_NAME" | tee -a "$GITHUB_OUTPUT"
+      - uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+        if: steps.where.outputs.exposure == 'tailnet'
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      - name: ${{ matrix.env }} answers and can write its data
+        if: steps.where.outputs.url
+        env:
+          URL: ${{ steps.where.outputs.url }}
+        run: |
+          for _ in 1 2 3; do
+            if body=$(curl -fsS -m 15 "$URL/api/health"); then break; fi
+            body=""; sleep 20
+          done
+          echo "health: ${body:-no answer}"
+          echo "$body" | grep -q '"writable":true' || { echo "::error::$URL is down or cannot write its data"; exit 1; }
+          rev=$(curl -fsS -m 15 "$URL/release.json?t=$(date +%s)" | sed -E 's/.*"revision":"([0-9a-f]+)".*/\1/')
+          echo "### ${{ matrix.env }}: up, serving ${rev:-unknown}" >> "$GITHUB_STEP_SUMMARY"

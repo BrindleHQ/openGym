@@ -71,8 +71,7 @@ cd mcp && npm test
 ## Using AI tools
 
 openGym itself is developed with Claude Code (see
-[How openGym is built](README.md#how-opengym-is-built)), and [`CLAUDE.md`](CLAUDE.md) holds the
-project context for it. You're welcome to use whatever tools you like for a pull request. The bar
+[How openGym is built](README.md#how-opengym-is-built)). You're welcome to use whatever tools you like for a pull request. The bar
 is the same either way: you understand the change, it's tested, and you can answer questions about
 it in review.
 

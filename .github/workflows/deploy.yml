@@ -1,0 +1,98 @@
+# Deploys one release to one environment: the single deploy path, called by test.yml (staging,
+# then production, for every green push to main) and promote.yml (by hand, an earlier release).
+#
+# The work happens on Boop Beep (deploy/opengym-release.sh): this job sends the release's
+# identity (commit and two image digests) over the tailnet with the environment's SSH key, which
+# can do nothing else there. The host renders the compose from its own installed template, so a
+# key picks which release runs, never what it runs as. Then this job checks the address the host
+# reports, from outside. A release that does not come up is rolled back by the host first.
+#
+# Rolling back does not go through here: `ssh boop-beep sudo opengym-release rollback <env>`
+# takes about 4 s (docs/BRINDLE_DEPLOY.md).
+name: Deploy a release
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      ref:
+        description: The release's commit (release.json must name it)
+        type: string
+        required: true
+      bootstrap:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 22
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ steps.where.outputs.url }}
+    # One deploy per environment at a time, never cut off. The host holds a lock as well.
+    concurrency:
+      group: deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    env:
+      ENV_NAME: ${{ inputs.environment }}
+      BOOTSTRAP: ${{ inputs.bootstrap }}
+    steps:
+      # The tooling of the calling workflow's commit (main), so an earlier release is deployed the
+      # current way; only its identity comes from release.json.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: release
+      - name: The release is the one asked for
+        env:
+          WANT: ${{ inputs.ref }}
+        run: |
+          test "$(jq -r .sha release.json)" = "$WANT" \
+            || { echo "::error::release.json is for $(jq -r .sha release.json), not $WANT"; exit 1; }
+      - name: Where ${{ inputs.environment }} answers (exposure in deploy/environments.json)
+        id: where
+        run: |
+          set -o pipefail
+          node scripts/deploy/coolify.mjs describe "$ENV_NAME" | tee -a "$GITHUB_OUTPUT"
+      # Boop Beep's SSH is reachable only on the tailnet: join it as an ephemeral tag:ci node.
+      - uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      - name: Deploy on Boop Beep
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          BOOP_BEEP_KNOWN_HOSTS: ${{ vars.BOOP_BEEP_KNOWN_HOSTS }}
+        run: |
+          # Without pipefail the step's status is tee's, and a failed deploy would look green.
+          set -o pipefail
+          if [ "$BOOTSTRAP" = true ]; then set -- --bootstrap; fi
+          jq -c '{sha, api, web, run_id}' release.json \
+            | scripts/deploy/ssh-release.sh deploy "$ENV_NAME" "$@" | tee deploy.jsonl
+      - name: Check it from outside Boop Beep
+        run: |
+          if [ "$BOOTSTRAP" = true ]; then set -- --bootstrap; fi
+          node scripts/deploy/coolify.mjs verify "$ENV_NAME" release.json --url "$(tail -1 deploy.jsonl | jq -r .url)" "$@"
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### ${ENV_NAME}"
+            if [ -s deploy.jsonl ]; then echo '```'; cat deploy.jsonl; echo '```'; fi
+            echo "Roll back: \`ssh boop-beep sudo opengym-release rollback ${ENV_NAME}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

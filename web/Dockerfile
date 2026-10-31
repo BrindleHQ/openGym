@@ -24,7 +24,11 @@ COPY frontend/ ./
 # image built between two releases calls itself the same thing, and "which build are you running?"
 # cannot be answered from the phone. Unset, the app reports package.json's version as before.
 ARG APP_BUILD=""
-RUN APP_BUILD="$APP_BUILD" npm run build
+# release.json names the commit this image was built from, so a deploy can check that the
+# address it updated is serving that commit (scripts/deploy/coolify.mjs). "dev" when unset.
+ARG VCS_REF=dev
+RUN APP_BUILD="$APP_BUILD" npm run build \
+ && printf '{"revision":"%s","build":"%s"}\n' "$VCS_REF" "$APP_BUILD" > dist/release.json
 
 FROM nginxinc/nginx-unprivileged:1.30.6-alpine
 # Same reason as in api/Dockerfile: alpine fixes land faster than the nginx image is rebuilt.

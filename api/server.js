@@ -636,7 +636,11 @@ function makeSession(user, kind = 'b') {
 // https ORIGIN; over plain http://localhost the old name stays, and localhost has no sibling
 // subdomains to worry about. Both names are accepted on the way in, so upgrading an instance
 // does not sign anybody out — they move onto the prefixed cookie at their next sign-in.
-const COOKIE = SECURE ? '__Host-gymsid' : 'gymsid';
+// SESSION_COOKIE renames it, for two instances on one hostname (staging and production on two
+// ports of a tailnet name): browsers keep cookies per host, not per port, so with one name a
+// sign-in to either replaced the other's session. Anything but a plain token keeps the default.
+const COOKIE_NAME = /^[A-Za-z0-9_-]+$/.test(process.env.SESSION_COOKIE || '') ? process.env.SESSION_COOKIE : 'gymsid';
+const COOKIE = SECURE ? '__Host-' + COOKIE_NAME : COOKIE_NAME;
 const LEGACY_COOKIE = 'gymsid';
 // Every value for a given name, in the order the browser sent them. Not an object: reducing
 // duplicates to one entry silently picks a winner, and picking the *last* one handed a shadowing

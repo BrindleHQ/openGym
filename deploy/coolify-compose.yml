@@ -1,0 +1,106 @@
+# The Coolify service behind staging and production on Boop Beep (docs/BRINDLE_DEPLOY.md).
+#
+# Not for `docker compose up`: scripts/deploy/coolify.mjs fills the double-underscore names from
+# deploy/environments.json and the release record (images by digest), uploads the result to the
+# environment's Coolify service and deploys it. So what runs is always this file at the released
+# commit, and nothing is configured by hand in the Coolify UI.
+#
+# openGym keeps its own secrets (session key, VAPID keys) inside the data directory, so the only
+# per-environment state is the two host directories below, created once by deploy/host-setup.sh.
+#
+# The address is __ORIGIN__ (`exposure` in deploy/environments.json). The web container always
+# listens on 127.0.0.1:__LOCAL_PORT__ of Boop Beep, behind `tailscale serve` (host-setup.sh); a
+# public environment also gets a Coolify domain, reached through the Cloudflare tunnel.
+services:
+  api:
+    image: __API_IMAGE__
+    # No host account has this uid; /srv/opengym/<env>/data is 10001:10001, mode 700. The Coach
+    # is off (COACH_DISABLED), and it is the only part of the API that needs root.
+    user: "10001:10001"
+    # Node as PID 1 ignores SIGTERM, so every stop waited out Docker's 10 s timeout. Under an init
+    # it exits at once; safe, since every write is temp-then-rename (api/durable.js).
+    init: true
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - DATA_DIR=/data
+      - RP_ID=__HOST__
+      - ORIGIN=__ORIGIN__
+      - RP_NAME=__RP_NAME__
+      - FIRST_USER_ADMIN=1
+      - INVITE_ONLY=__INVITE_ONLY__
+      - ALLOW_GUEST=__ALLOW_GUEST__
+      - COACH_DISABLED=1
+      # On the tailnet both environments share one hostname, and browsers do not separate cookies
+      # by port: without their own names, signing in to one would sign you out of the other.
+      - SESSION_COOKIE=gymsid-__ENV__
+      - VAPID_SUBJECT=__ORIGIN__
+      # Only the web container can reach the API, and its nginx overwrites the forwarded headers.
+      - TRUST_PROXY=1
+    volumes:
+      - /srv/opengym/__ENV__/data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+      # Probe every second until the first success, so a new container counts as healthy (and web
+      # starts behind it) within seconds, not at the first 30 s interval. Deploys and rollbacks wait on it.
+      start_interval: 1s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+  web:
+    image: __WEB_IMAGE__
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:__LOCAL_PORT__:8080"
+    environment:
+      - NGINX_PORT=8080
+      - BACKEND=api
+      - PORT=3000
+      # Public: the visitor's address from Cloudflare, for the sign-in throttle. Tailnet: empty,
+      # which drops the header. Set by the deploy script (serviceEnv in scripts/deploy/coolify.mjs).
+      - CF_CONNECTING_IP=${CF_CONNECTING_IP}
+    # Through nginx to the API: green means the proxy and the API both answer.
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+      # Probe every second until the first success, so a new container counts as healthy (and web
+      # starts behind it) within seconds, not at the first 30 s interval. Deploys and rollbacks wait on it.
+      start_interval: 1s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+  # Nightly archive of the data directory, kept for __RETENTION_DAYS__ days in
+  # /srv/opengym/__ENV__/backups (root only). The API writes every file temp-then-rename, so
+  # archiving while it runs reads whole files; it is not stopped.
+  backup:
+    image: offen/docker-volume-backup:v2.50.1@sha256:06fccb4c6ff79c4d5e4a839ace17c174da82a9327f43594f8a2c6a15f43bc660
+    restart: unless-stopped
+    environment:
+      - BACKUP_CRON_EXPRESSION=__BACKUP_CRON__
+      - BACKUP_FILENAME=opengym-__ENV__-%Y-%m-%dT%H-%M-%S.tar.gz
+      - BACKUP_PRUNING_PREFIX=opengym-__ENV__-
+      - BACKUP_RETENTION_DAYS=__RETENTION_DAYS__
+    volumes:
+      - /srv/opengym/__ENV__/data:/backup/opengym-data:ro
+      - /srv/opengym/__ENV__/backups:/archive
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"

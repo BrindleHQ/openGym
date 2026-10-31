@@ -1,0 +1,81 @@
+# Deploys an earlier release to staging or production, by hand: one that is no longer among the
+# ten kept on Boop Beep (those are a rollback away: `ssh boop-beep sudo opengym-release rollback
+# <env> [release-id]`), or the first production deploy with bootstrap on. Pick a Tests run on
+# main whose staging deploy went green; scripts/deploy/promotion.mjs checks it, and deploy.yml
+# deploys its two image digests with the deploy/ configuration of that commit. Nothing is rebuilt.
+# docs/BRINDLE_DEPLOY.md has the walk-through.
+name: Deploy an earlier release
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Where to deploy it
+        type: choice
+        options: [production, staging]
+        default: production
+      run_id:
+        description: Tests run ID on main whose staging deploy succeeded (the number in its URL)
+        required: true
+        type: string
+      bootstrap:
+        description: First deploy of a fresh instance only, turns INVITE_ONLY off so the owner can sign up
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  NODE_VERSION: 22
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main' && github.repository == 'BrindleHQ/openGym'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.check.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/deploy
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: release
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: The run is a green push to main that reached staging
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: node scripts/deploy/promotion.mjs "$RUN_ID" release.json
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: release
+          path: release.json
+          retention-days: 90
+          if-no-files-found: error
+      - name: Summary
+        env:
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          {
+            echo "### Release from run ${RUN_ID}"
+            echo '```json'; cat release.json; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: verify
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: ${{ inputs.environment }}
+      ref: ${{ needs.verify.outputs.sha }}
+      bootstrap: ${{ inputs.bootstrap }}
+    secrets: inherit
