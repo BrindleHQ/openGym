@@ -176,6 +176,32 @@ off-site, encrypted target is a decision for the owner (see the open items in th
   activity; GitHub emails you before that happens. Coolify Sentinel already reports host CPU,
   memory and disk.
 
+## Production cutover (not done yet)
+
+Production is prepared but has never run: the `opengym-production` service exists in Coolify
+with placeholder images and is stopped, and `/srv/opengym/production/{data,backups}` exist and
+are empty. To bring it up:
+
+1. **Make `opengym.brindle.co` resolve.** On 2026-10-31 `brindle.co` was delegated to Linode name
+   servers that refuse every query for it, so no record under it resolves. Either:
+   - move `brindle.co` to the Cloudflare account that serves `brindle.to`, then add a public
+     hostname `opengym.brindle.co` to the existing tunnel, pointing at `http://localhost:80`
+     (the same target as `*.brindle.to`); or
+   - serve production on a `brindle.to` name instead: change `production.host` in
+     `deploy/environments.json` (and the URL in `promote.yml` and `uptime.yml`) in a pull
+     request. Do this before step 3. A passkey cannot move hostnames.
+2. Merge to `main`, and wait for the Tests run to deploy staging.
+3. Run **Promote to production** with that run's ID and **bootstrap** ticked. Approve it.
+4. Open <https://opengym.brindle.co> at once and create the owner profile. The first profile
+   becomes the admin.
+5. Run **Promote to production** again, same run ID, bootstrap off, so the instance is
+   invite-only again. Check that `https://opengym.brindle.co/api/config` shows
+   `"invite_only":true`.
+6. Pair the iPhone app: on the website, Settings, Account, Pair the mobile app. In the app,
+   enter the server address `https://opengym.brindle.co` and the code.
+7. Set the repository variable `PRODUCTION_LIVE` to `true` (uptime checks), and run
+   `sudo deploy/restore-test.sh production` once the first nightly archive exists.
+
 ## Passkeys and hostnames
 
 A passkey works only on the exact hostname it was created for (`RP_ID`). `RP_ID` and `ORIGIN`
