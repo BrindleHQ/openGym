@@ -7,9 +7,9 @@
 # level `paths:`. That way the workflow always reports, and a change to api/ alone does not
 # spend four minutes building the frontend.
 #
-# A push to main that passes goes on to `publish` (images by digest) and `deploy-staging`;
-# production is promote.yml, by hand, behind the production environment's approval
-# (docs/BRINDLE_DEPLOY.md). Pull requests never reach those jobs or their secrets.
+# A push to main that passes goes on to `publish` (images by digest), `deploy-staging` and
+# `deploy-production` (docs/BRINDLE_DEPLOY.md). Pull requests never reach those jobs or their
+# secrets.
 #
 # Every run writes its numbers (tests and coverage per app area, slowest tests, runtime) to the
 # job summary through scripts/ci/test-report.mjs and keeps them as the `test-stats` artifact.
@@ -108,6 +108,7 @@ jobs:
             deploy:
               - '.github/workflows/test.yml'
               - '.github/workflows/promote.yml'
+              - '.github/workflows/deploy.yml'
               - 'deploy/**'
               - 'scripts/deploy/**'
             catalogue:
@@ -610,61 +611,26 @@ jobs:
             echo '```json'; cat release.json; echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # Every green push to main lands on staging. One staging deploy at a time; a newer one waits
-  # for the running one rather than cutting it off. The token is the staging environment's own
-  # secret, which only main may use (environment branch policy).
+  # Every green push to main goes to staging, then, if staging took it, to production: the
+  # same release, nothing rebuilt (the T3 Code pattern: main is what runs). Each environment's
+  # SSH key is its own environment secret, usable from main only. Rollback is one command on
+  # Boop Beep, not a pipeline run (docs/BRINDLE_DEPLOY.md).
   deploy-staging:
     needs: publish
     if: >-
       !cancelled() && needs.publish.result == 'success' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment:
-      name: staging
-      url: ${{ steps.where.outputs.url }}
-    concurrency:
-      group: deploy-staging
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: release
-      - name: Where staging answers (exposure in deploy/environments.json)
-        id: where
-        run: node scripts/deploy/coolify.mjs describe staging | tee -a "$GITHUB_OUTPUT"
-      # A tailnet environment is reachable only on the tailnet: join it as an ephemeral tag:ci
-      # node (the tailnet policy lets tag:ci reach only openGym's two ports on Boop Beep).
-      - uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
-        if: steps.where.outputs.exposure == 'tailnet'
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-      - name: Deploy and verify staging
-        env:
-          COOLIFY_URL: ${{ vars.COOLIFY_URL }}
-          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
-          COOLIFY_SERVICE_UUID: ${{ vars.COOLIFY_SERVICE_UUID }}
-        run: node scripts/deploy/coolify.mjs deploy staging release.json
-      - name: Summary
-        if: always()
-        run: |
-          {
-            echo "### Staging"
-            if [ -f deployment-result.json ]; then echo '```json'; cat deployment-result.json; echo '```'
-            else echo "Deploy did not finish; the log above says where it stopped. Container logs are in Coolify (project openGym, staging)."; fi
-            echo "Promote this run to production: Actions, Promote to production, run_id ${GITHUB_RUN_ID}"
-          } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        if: always()
-        with:
-          name: staging-deployment
-          path: deployment-result.json
-          retention-days: 90
-          if-no-files-found: ignore
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: staging
+      ref: ${{ github.sha }}
+    secrets: inherit
+
+  deploy-production:
+    needs: deploy-staging
+    if: >-
+      !cancelled() && needs.deploy-staging.result == 'success' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: production
+      ref: ${{ github.sha }}
+    secrets: inherit

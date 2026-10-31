@@ -1,16 +1,19 @@
-# Production moves only here, by hand. Pick a Tests run on main whose deploy-staging job went
-# green; this workflow checks that run (scripts/deploy/promotion.mjs), then waits for the
-# production environment's required reviewer before it deploys the same two image digests that
-# staging is running. Nothing is rebuilt. Rolling back is the same thing with an older run.
-#
-# The deploy uses deploy/ and scripts/deploy/ as they were at the promoted commit, so production
-# gets the configuration that went through staging along with the images.
+# Deploys an earlier release to staging or production, by hand: one that is no longer among the
+# ten kept on Boop Beep (those are a rollback away: `ssh boop-beep sudo opengym-release rollback
+# <env> [release-id]`), or the first production deploy with bootstrap on. Pick a Tests run on
+# main whose staging deploy went green; scripts/deploy/promotion.mjs checks it, and deploy.yml
+# deploys its two image digests with the deploy/ configuration of that commit. Nothing is rebuilt.
 # docs/BRINDLE_DEPLOY.md has the walk-through.
-name: Promote to production
+name: Deploy an earlier release
 
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: Where to deploy it
+        type: choice
+        options: [production, staging]
+        default: production
       run_id:
         description: Tests run ID on main whose staging deploy succeeded (the number in its URL)
         required: true
@@ -23,11 +26,6 @@ on:
 permissions:
   contents: read
   actions: read
-
-# One production deploy at a time, and never cut one off.
-concurrency:
-  group: deploy-production
-  cancel-in-progress: false
 
 env:
   NODE_VERSION: 22
@@ -69,60 +67,15 @@ jobs:
           RUN_ID: ${{ inputs.run_id }}
         run: |
           {
-            echo "### Candidate for production (from run ${RUN_ID})"
+            echo "### Release from run ${RUN_ID}"
             echo '```json'; cat release.json; echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-  production:
+  deploy:
     needs: verify
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment:
-      name: production
-      url: ${{ steps.where.outputs.url }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          ref: ${{ needs.verify.outputs.sha }}
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: release
-      - name: Where production answers (exposure in deploy/environments.json)
-        id: where
-        run: node scripts/deploy/coolify.mjs describe production | tee -a "$GITHUB_OUTPUT"
-      # A tailnet environment is reachable only on the tailnet: join it as an ephemeral tag:ci
-      # node (the tailnet policy lets tag:ci reach only openGym's two ports on Boop Beep).
-      - uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
-        if: steps.where.outputs.exposure == 'tailnet'
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-      - name: Deploy and verify production
-        env:
-          COOLIFY_URL: ${{ vars.COOLIFY_URL }}
-          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
-          COOLIFY_SERVICE_UUID: ${{ vars.COOLIFY_SERVICE_UUID }}
-          BOOTSTRAP: ${{ inputs.bootstrap }}
-        run: |
-          if [ "$BOOTSTRAP" = true ]; then set -- --bootstrap; fi
-          node scripts/deploy/coolify.mjs deploy production release.json "$@"
-      - name: Summary
-        if: always()
-        run: |
-          {
-            echo "### Production"
-            if [ -f deployment-result.json ]; then echo '```json'; cat deployment-result.json; echo '```'
-            else echo "Deploy did not finish; the log above says where it stopped. Container logs are in Coolify (project openGym, production)."; fi
-          } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        if: always()
-        with:
-          name: production-deployment
-          path: deployment-result.json
-          retention-days: 90
-          if-no-files-found: ignore
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: ${{ inputs.environment }}
+      ref: ${{ needs.verify.outputs.sha }}
+      bootstrap: ${{ inputs.bootstrap }}
+    secrets: inherit
