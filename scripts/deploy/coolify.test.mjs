@@ -50,6 +50,7 @@ for (const env of ['staging', 'production']) {
       assert.doesNotMatch(out, new RegExp(`/srv/opengym/${other}/`), 'one environment never mounts the other\'s data');
       assert.match(out, /INVITE_ONLY=1\n/);
       assert.match(out, /COACH_DISABLED=1\n/);
+      assert.match(out, new RegExp(`SESSION_COOKIE=gymsid-${env}\n`), 'its own session cookie on the shared tailnet hostname');
     });
   }
 }

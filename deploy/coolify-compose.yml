@@ -28,6 +28,9 @@ services:
       - INVITE_ONLY=__INVITE_ONLY__
       - ALLOW_GUEST=__ALLOW_GUEST__
       - COACH_DISABLED=1
+      # On the tailnet both environments share one hostname, and browsers do not separate cookies
+      # by port: without their own names, signing in to one would sign you out of the other.
+      - SESSION_COOKIE=gymsid-__ENV__
       - VAPID_SUBJECT=__ORIGIN__
       # Only the web container can reach the API, and its nginx overwrites the forwarded headers.
       - TRUST_PROXY=1

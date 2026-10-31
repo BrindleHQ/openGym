@@ -227,7 +227,9 @@ A passkey works only on the exact hostname it was created for (`RP_ID`). `RP_ID`
 come from the environment's active address (`exposure` above). On the tailnet, staging and
 production share the hostname `boop-beep.tail5728d8.ts.net` on different ports, so a passkey made
 on one is offered on the other too. It does not work there, because that server has never seen
-it, and it is harmless. Changing an environment's address later locks every account out of it.
+it, and it is harmless. Cookies are shared by host too, so each environment names its own session
+cookie (`SESSION_COOKIE=gymsid-<env>` in the compose file); you can be signed in to both in one
+browser. Changing an environment's address later locks every account out of it.
 
 Both environments start invite-only (`inviteOnly: true`, guests off). A fresh instance has no
 admin to issue the first invite, so its first deploy uses `--bootstrap`. The `bootstrap` input of
