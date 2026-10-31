@@ -516,7 +516,10 @@ jobs:
   # Pushes to this repository only: a pull request, or a fork, never gets here.
   publish:
     needs: tests-ok
+    # !cancelled() and the explicit result, not the implicit success(): that one also needs every
+    # job upstream of tests-ok to have run, and the path filter skips some on most pushes.
     if: >-
+      !cancelled() && needs.tests-ok.result == 'success' &&
       github.event_name == 'push' && github.repository == 'BrindleHQ/openGym' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/ci-'))
     runs-on: ubuntu-latest
@@ -612,7 +615,8 @@ jobs:
   # secret, which only main may use (environment branch policy).
   deploy-staging:
     needs: publish
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      !cancelled() && needs.publish.result == 'success' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
