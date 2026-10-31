@@ -13,7 +13,7 @@ set -euo pipefail
 [ "$(id -u)" = 0 ] || { echo "run as root" >&2; exit 1; }
 env=${1:?usage: restore-test.sh <env> [archive]}
 case "$env" in staging|production) ;; *) echo "unknown environment: $env" >&2; exit 2 ;; esac
-archive=${2:-$(ls -1t "/srv/opengym/$env/backups"/opengym-"$env"-*.tar.gz 2>/dev/null | head -1)}
+archive=${2:-$(ls -1t "/srv/opengym/$env/backups/opengym-$env-"*.tar.gz 2>/dev/null | head -1)}
 [ -f "$archive" ] || { echo "no archive found for $env" >&2; exit 1; }
 
 # The API container of this environment: the running one that mounts its data at /data.

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateRelease, environmentConfig, renderCompose, serviceState, expectedPublic, publicMismatch, address, serviceEnv } from './coolify.mjs';
+import { validateRelease, environmentConfig, renderCompose, expectedPublic, publicMismatch, address, serviceEnv, buildPlan } from './coolify.mjs';
 import { promotionProblems } from './promotion.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -84,15 +84,22 @@ test('an unknown placeholder fails the render instead of shipping literally', ()
   assert.throws(() => renderCompose('image: __NOPE__', 'staging', environments.staging, release), /Unknown placeholder __NOPE__/);
 });
 
-test('service state: healthy api and web, a running backup', () => {
-  const svc = s => ({ applications: [{ name: 'api', status: s[0] }, { name: 'web', status: s[1] }, { name: 'backup', status: s[2] }] });
-  assert.deepEqual(serviceState(svc(['running:healthy', 'running:healthy', 'running:unknown'])).ok, true);
-  assert.equal(serviceState(svc(['running:starting', 'running:healthy', 'running:unknown'])).done, false);
-  // Not final by itself: right after a deploy is queued this is often the state from before it.
-  const crashed = serviceState(svc(['exited:unhealthy', 'running:healthy', 'running:unknown']));
-  assert.deepEqual([crashed.done, crashed.bad], [false, true]);
-  assert.match(crashed.reason, /api is exited/);
-  assert.equal(serviceState({ applications: [{ name: 'api', status: 'running:healthy' }] }).done, false);
+test('a plan carries exactly what opengym-release checks and runs', () => {
+  const cfg = environments.production;
+  const plan = buildPlan(template, 'production', cfg, { ...release, run_id: 42 });
+  // The same fields deploy/opengym-release.sh validates before it touches anything.
+  assert.equal(plan.env, 'production');
+  assert.deepEqual(plan.release, { sha: release.sha, api: release.api, web: release.web, run_id: '42' });
+  assert.equal(typeof plan.docker_compose_raw, 'string');
+  assert.equal(Buffer.from(plan.docker_compose_raw, 'base64').toString(), renderCompose(template, 'production', cfg, release));
+  assert.equal(plan.local_port, cfg.localPort);
+  assert.deepEqual(plan.expect, { invite_only: true, allow_guest: false });
+  assert.deepEqual(plan.urls, [{ name: 'web', url: address(cfg).coolifyDomain }]);
+  assert.deepEqual(plan.service_env, serviceEnv(address(cfg)));
+  // Bootstrap opens signup in the compose and in what the host waits to see.
+  const boot = buildPlan(template, 'production', cfg, release, { bootstrap: true });
+  assert.deepEqual(boot.expect, { invite_only: false, allow_guest: false });
+  assert.match(Buffer.from(boot.docker_compose_raw, 'base64').toString(), /INVITE_ONLY=0\n/);
 });
 
 test('a deploy waits for the configuration it rendered, not only the revision', () => {
@@ -109,7 +116,7 @@ const goodRun = {
   id: 7, path: '.github/workflows/test.yml', event: 'push', head_branch: 'main', head_sha: release.sha,
   head_repository: { full_name: 'BrindleHQ/openGym' }, status: 'completed', conclusion: 'success',
 };
-const stagedJobs = [{ name: 'publish', conclusion: 'success' }, { name: 'deploy-staging', conclusion: 'success' }];
+const stagedJobs = [{ name: 'publish', conclusion: 'success' }, { name: 'deploy-staging / deploy', conclusion: 'success' }];
 const check = (run, jobs = stagedJobs, rel = release) => promotionProblems({ run, jobs, release: rel, repo: 'BrindleHQ/openGym' });
 
 test('promotion: a green main push that reached staging qualifies', () => {
@@ -123,6 +130,7 @@ test('promotion: anything else is refused, with the reason', () => {
   assert.match(check({ ...goodRun, head_repository: { full_name: 'someone/openGym' } }).join(), /not BrindleHQ\/openGym/);
   assert.match(check({ ...goodRun, conclusion: 'failure' }).join(), /not completed\/success/);
   assert.match(check({ ...goodRun, path: '.github/workflows/audit.yml' }).join(), /not the Tests workflow/);
-  assert.match(check(goodRun, [{ name: 'deploy-staging', conclusion: 'skipped' }]).join(), /no successful deploy-staging/);
+  assert.match(check(goodRun, [{ name: 'deploy-staging / deploy', conclusion: 'skipped' }]).join(), /no successful deploy-staging/);
+  assert.match(check(goodRun, [{ name: 'deploy-production / deploy', conclusion: 'success' }]).join(), /no successful deploy-staging/);
   assert.match(check(goodRun, stagedJobs, { ...release, sha: 'b'.repeat(40) }).join(), /release\.json is for/);
 });

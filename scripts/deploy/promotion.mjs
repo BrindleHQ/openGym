@@ -16,7 +16,8 @@ export function promotionProblems({ run, jobs, release, repo }) {
   if (run.head_branch !== 'main') problems.push(`run ${run.id} is on ${run.head_branch}, not main`);
   if (run.head_repository?.full_name !== repo) problems.push(`run ${run.id} built ${run.head_repository?.full_name}, not ${repo}`);
   if (run.status !== 'completed' || run.conclusion !== 'success') problems.push(`run ${run.id} is ${run.status}/${run.conclusion}, not completed/success`);
-  const staged = jobs.find(j => j.name === 'deploy-staging');
+  // deploy-staging calls deploy.yml, so its job is listed as "deploy-staging / deploy".
+  const staged = jobs.find(j => j.name === 'deploy-staging' || j.name.startsWith('deploy-staging / '));
   if (!staged || staged.conclusion !== 'success') problems.push(`run ${run.id} has no successful deploy-staging job`);
   if (release && release.sha !== run.head_sha) problems.push(`release.json is for ${release.sha}, the run built ${run.head_sha}`);
   return problems;

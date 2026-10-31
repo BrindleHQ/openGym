@@ -1,17 +1,17 @@
 #!/usr/bin/env node
-// Deploys one release record to one environment's Coolify service, and proves it landed.
-// docs/BRINDLE_DEPLOY.md explains where this sits; .github/workflows/test.yml (staging) and
-// promote.yml (production) are the callers.
+// Turns a release record into what an environment runs, and checks it from the outside.
+// docs/BRINDLE_DEPLOY.md explains where this sits.
 //
-//   node scripts/deploy/coolify.mjs render    <env> <release.json>   print the compose it would upload
-//   node scripts/deploy/coolify.mjs provision <env> <release.json>   create the Coolify service (once)
-//   node scripts/deploy/coolify.mjs deploy    <env> <release.json>   upload, deploy, verify
+//   node scripts/deploy/coolify.mjs plan      <env> <release.json> [--bootstrap]  the deploy plan for opengym-release
+//   node scripts/deploy/coolify.mjs verify    <env> <release.json>                wait until <env>'s address serves it
+//   node scripts/deploy/coolify.mjs render    <env> <release.json>                the compose the plan carries
+//   node scripts/deploy/coolify.mjs describe  <env>                               exposure= and url= lines (workflows)
+//   node scripts/deploy/coolify.mjs provision <env> <release.json>                create the Coolify service (once)
 //
-// --bootstrap (deploy only) turns INVITE_ONLY off for that one deploy, so the owner's profile can
-// be created on a fresh instance (invite codes come from an admin, and there is none yet).
-//
-// Environment: COOLIFY_URL, COOLIFY_TOKEN, and COOLIFY_SERVICE_UUID (deploy) or
-// COOLIFY_PROJECT_UUID + COOLIFY_SERVER_UUID (provision). Writes deployment-result.json.
+// The deploy itself runs on Boop Beep (deploy/opengym-release.sh), which takes the plan on stdin.
+// --bootstrap turns INVITE_ONLY off for that one release, so the owner's profile can be created
+// on a fresh instance (invite codes come from an admin, and there is none yet).
+// provision needs COOLIFY_URL, COOLIFY_TOKEN, COOLIFY_PROJECT_UUID and COOLIFY_SERVER_UUID.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -110,27 +110,7 @@ export function coolifyClient({ url, token, request = fetch }) {
   };
 }
 
-// Coolify reports "<state>:<health>" per container. The API and web carry healthchecks, so they
-// have to be healthy; the backup container has none and reports running:unknown. `bad` is not
-// final on its own: right after the deploy is queued Coolify still reports the state from before
-// it (a stopped service reads "exited"), so the caller only fails once a bad state persists.
-export function serviceState(service) {
-  const apps = Object.fromEntries((service.applications || []).map(a => [a.name, a]));
-  const missing = ['api', 'web', 'backup'].filter(n => !apps[n]);
-  if (missing.length) return { done: false, reason: `missing containers: ${missing.join(', ')}` };
-  const bad = Object.values(apps).find(a => /^(exited|degraded|restarting)/.test(a.status || ''));
-  if (bad) return { done: false, bad: true, reason: `${bad.name} is ${bad.status}` };
-  const waiting = ['api', 'web'].filter(n => apps[n].status !== 'running:healthy');
-  if (waiting.length) return { done: false, reason: waiting.map(n => `${n} ${apps[n].status}`).join(', ') };
-  if (!/^running/.test(apps.backup.status || '')) return { done: false, reason: `backup ${apps.backup.status}` };
-  return { done: true, ok: true, apps };
-}
-
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-// How long a container may stay exited or restarting before the deploy counts as failed. Long
-// enough for Coolify to pull and start both images, short of the overall timeout.
-const BAD_FOR_MS = 3 * 60000;
-
 async function waitFor(what, fn, { timeoutMs, everyMs = 5000 }) {
   const until = Date.now() + timeoutMs;
   let last = 'not checked yet';
@@ -148,9 +128,8 @@ async function waitFor(what, fn, { timeoutMs, everyMs = 5000 }) {
   }
 }
 
-// What the new containers must say publicly. The revision proves the images (both are rebuilt
-// for every commit); the two flags prove the configuration, since a redeploy that changes only
-// configuration keeps the old containers answering, healthy, until Coolify gets to restarting them.
+// What the new release must show at its address: the revision proves the images (both are
+// rebuilt for every commit), the two flags the configuration.
 export function expectedPublic(cfg, { bootstrap = false } = {}) {
   return { invite_only: !!cfg.inviteOnly && !bootstrap, allow_guest: !!cfg.allowGuest };
 }
@@ -185,6 +164,20 @@ function load(env, releasePath) {
 
 const b64 = s => Buffer.from(s, 'utf8').toString('base64');
 
+// Everything opengym-release needs for one deploy; it checks the same fields before acting.
+export function buildPlan(template, env, cfg, release, { bootstrap = false } = {}) {
+  const where = address(cfg);
+  return {
+    env,
+    release: { sha: release.sha, api: release.api, web: release.web, ...(release.run_id ? { run_id: String(release.run_id) } : {}) },
+    docker_compose_raw: b64(renderCompose(template, env, cfg, release, { bootstrap })),
+    urls: [{ name: 'web', url: where.coolifyDomain }],
+    service_env: serviceEnv(where),
+    local_port: cfg.localPort,
+    expect: expectedPublic(cfg, { bootstrap }),
+  };
+}
+
 async function main(argv) {
   const [cmd, env, releasePath, ...flags] = argv;
   if (cmd === 'describe' && env) {
@@ -193,73 +186,35 @@ async function main(argv) {
     const where = address(environmentConfig(environments, env));
     return void process.stdout.write(`exposure=${where.exposure}\nurl=${where.url}\n`);
   }
-  if (!['render', 'provision', 'deploy'].includes(cmd) || !env || !releasePath) {
-    console.error('usage: coolify.mjs render|provision|deploy <env> <release.json> [--bootstrap]\n       coolify.mjs describe <env>');
+  if (!['plan', 'verify', 'render', 'provision'].includes(cmd) || !env || !releasePath) {
+    console.error('usage: coolify.mjs plan|verify|render|provision <env> <release.json> [--bootstrap]\n       coolify.mjs describe <env>');
     process.exit(2);
   }
   const bootstrap = flags.includes('--bootstrap');
   const { release, cfg, template } = load(env, releasePath);
-  const compose = renderCompose(template, env, cfg, release, { bootstrap });
-  if (cmd === 'render') return void process.stdout.write(compose);
+  if (cmd === 'render') return void process.stdout.write(renderCompose(template, env, cfg, release, { bootstrap }));
+  if (cmd === 'plan') return void process.stdout.write(JSON.stringify(buildPlan(template, env, cfg, release, { bootstrap })) + '\n');
 
-  const api = coolifyClient({ url: process.env.COOLIFY_URL, token: process.env.COOLIFY_TOKEN });
   const where = address(cfg);
-  const urls = [{ name: 'web', url: where.coolifyDomain }];
-
-  if (cmd === 'provision') {
-    const { COOLIFY_PROJECT_UUID: project_uuid, COOLIFY_SERVER_UUID: server_uuid } = process.env;
-    if (!project_uuid || !server_uuid) throw new Error('COOLIFY_PROJECT_UUID and COOLIFY_SERVER_UUID are required');
-    const made = await api('POST', 'services', {
-      name: `opengym-${env}`, description: `openGym ${env} (BrindleHQ/openGym, docs/BRINDLE_DEPLOY.md)`,
-      project_uuid, server_uuid, environment_name: env, instant_deploy: false,
-      docker_compose_raw: b64(compose), urls,
-    });
-    await api('PATCH', `services/${made.uuid}/envs/bulk`, { data: serviceEnv(where) });
-    console.log(`created service ${made.uuid}; set COOLIFY_SERVICE_UUID for the ${env} environment to it`);
+  if (cmd === 'verify') {
+    // The host already checked its loopback port; this is the same check through the address
+    // people use (tailnet or Cloudflare), from outside Boop Beep.
+    const live = await waitFor(where.url, () => publicChecks(where.url, release, expectedPublic(cfg, { bootstrap })), { timeoutMs: 2 * 60000, everyMs: 2000 });
+    console.log(`${env} is serving ${release.sha} at ${where.url} (${live.users} profiles)`);
     return;
   }
 
-  const uuid = process.env.COOLIFY_SERVICE_UUID;
-  if (!uuid) throw new Error('COOLIFY_SERVICE_UUID is required');
-  const started = new Date().toISOString();
-  console.log(`${env} (${where.exposure}, ${where.url}): ${release.sha}\n  api ${release.api}\n  web ${release.web}${bootstrap ? '\n  bootstrap: INVITE_ONLY off for this deploy' : ''}`);
-  const before = await api('GET', `services/${uuid}`);
-  if (before.name !== `opengym-${env}`) throw new Error(`Service ${uuid} is "${before.name}", not opengym-${env}: refusing to deploy to the wrong environment`);
-
-  await api('PATCH', `services/${uuid}`, { docker_compose_raw: b64(compose), urls });
-  await api('PATCH', `services/${uuid}/envs/bulk`, { data: serviceEnv(where) });
-  const queued = await api('POST', `deploy?uuid=${encodeURIComponent(uuid)}&force=false`);
-  console.log(`  queued: ${JSON.stringify(queued.deployments || queued)}`);
-
-  // A redeploy of the same digests can report healthy before the queued restart begins, so the
-  // check that matters is the public one: the new revision answering at its tailnet address.
-  let badSince = null;
-  const state = await waitFor('containers', async () => {
-    const s = serviceState(await api('GET', `services/${uuid}`));
-    if (s.bad) {
-      badSince ??= Date.now();
-      if (Date.now() - badSince > BAD_FOR_MS) return { done: true, ok: false, reason: `${s.reason} for ${BAD_FOR_MS / 1000}s` };
-      return s;
-    }
-    badSince = null;
-    if (s.done && s.ok) {
-      const images = { api: s.apps.api.image, web: s.apps.web.image };
-      if (images.api && images.api !== release.api) return { done: false, reason: `api runs ${images.api}` };
-      if (images.web && images.web !== release.web) return { done: false, reason: `web runs ${images.web}` };
-    }
-    return s;
-  }, { timeoutMs: 8 * 60000 });
-  const want = expectedPublic(cfg, { bootstrap });
-  const live = await waitFor(where.url, () => publicChecks(where.url, release, want), { timeoutMs: 5 * 60000 });
-
-  const result = {
-    environment: env, url: where.url, exposure: where.exposure, service: uuid, sha: release.sha,
-    api: release.api, web: release.web, bootstrap, started, finished: new Date().toISOString(),
-    containers: Object.fromEntries(Object.entries(state.apps).map(([n, a]) => [n, a.status])),
-    users: live.users,
-  };
-  fs.writeFileSync('deployment-result.json', JSON.stringify(result, null, 2) + '\n');
-  console.log(`${env} is serving ${release.sha} at ${where.url}`);
+  const plan = buildPlan(template, env, cfg, release, { bootstrap });
+  const api = coolifyClient({ url: process.env.COOLIFY_URL, token: process.env.COOLIFY_TOKEN });
+  const { COOLIFY_PROJECT_UUID: project_uuid, COOLIFY_SERVER_UUID: server_uuid } = process.env;
+  if (!project_uuid || !server_uuid) throw new Error('COOLIFY_PROJECT_UUID and COOLIFY_SERVER_UUID are required');
+  const made = await api('POST', 'services', {
+    name: `opengym-${env}`, description: `openGym ${env} (BrindleHQ/openGym, docs/BRINDLE_DEPLOY.md)`,
+    project_uuid, server_uuid, environment_name: env, instant_deploy: false,
+    docker_compose_raw: plan.docker_compose_raw, urls: plan.urls,
+  });
+  await api('PATCH', `services/${made.uuid}/envs/bulk`, { data: plan.service_env });
+  console.log(`created service ${made.uuid}; write it to /srv/opengym/${env}/service-uuid on Boop Beep`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
