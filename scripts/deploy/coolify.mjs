@@ -2,13 +2,14 @@
 // Turns a release record into what an environment runs, and checks it from the outside.
 // docs/BRINDLE_DEPLOY.md explains where this sits.
 //
-//   node scripts/deploy/coolify.mjs plan      <env> <release.json> [--bootstrap]  the deploy plan for opengym-release
-//   node scripts/deploy/coolify.mjs verify    <env> <release.json>                wait until <env>'s address serves it
+//   node scripts/deploy/coolify.mjs plan      <env> <release.json> [--bootstrap]  the deploy plan (opengym-release renders it on the host)
+//   node scripts/deploy/coolify.mjs verify    <env> <release.json> [--url <url>]  wait until <env>'s address serves it
 //   node scripts/deploy/coolify.mjs render    <env> <release.json>                the compose the plan carries
 //   node scripts/deploy/coolify.mjs describe  <env>                               exposure= and url= lines (workflows)
 //   node scripts/deploy/coolify.mjs provision <env> <release.json>                create the Coolify service (once)
 //
-// The deploy itself runs on Boop Beep (deploy/opengym-release.sh), which takes the plan on stdin.
+// The deploy runs on Boop Beep (deploy/opengym-release.sh): it takes a release's identity and
+// runs `plan` itself, from its own installed copy of this file and deploy/, in a sandbox.
 // --bootstrap turns INVITE_ONLY off for that one release, so the owner's profile can be created
 // on a fresh instance (invite codes come from an admin, and there is none yet).
 // provision needs COOLIFY_URL, COOLIFY_TOKEN, COOLIFY_PROJECT_UUID and COOLIFY_SERVER_UUID.
@@ -169,6 +170,7 @@ export function buildPlan(template, env, cfg, release, { bootstrap = false } = {
   const where = address(cfg);
   return {
     env,
+    url: where.url,
     release: { sha: release.sha, api: release.api, web: release.web, ...(release.run_id ? { run_id: String(release.run_id) } : {}) },
     docker_compose_raw: b64(renderCompose(template, env, cfg, release, { bootstrap })),
     urls: [{ name: 'web', url: where.coolifyDomain }],
@@ -197,6 +199,10 @@ async function main(argv) {
 
   const where = address(cfg);
   if (cmd === 'verify') {
+    // --url: the address the host reported for this deploy (its installed settings decide it).
+    const i = flags.indexOf('--url');
+    if (i >= 0) where.url = flags[i + 1];
+    if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/.test(where.url || '')) throw new Error(`not an address: ${where.url}`);
     // The host already checked its loopback port; this is the same check through the address
     // people use (tailnet or Cloudflare), from outside Boop Beep.
     const live = await waitFor(where.url, () => publicChecks(where.url, release, expectedPublic(cfg, { bootstrap })), { timeoutMs: 2 * 60000, everyMs: 2000 });

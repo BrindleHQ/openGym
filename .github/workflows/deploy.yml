@@ -1,10 +1,11 @@
 # Deploys one release to one environment: the single deploy path, called by test.yml (staging,
 # then production, for every green push to main) and promote.yml (by hand, an earlier release).
 #
-# The work happens on Boop Beep (deploy/opengym-release.sh): this job renders the plan from the
-# release's own commit, sends it over the tailnet with the environment's SSH key (which can do
-# nothing else there), and then checks the environment's address from outside. A release that
-# does not come up is rolled back by the host before this job fails.
+# The work happens on Boop Beep (deploy/opengym-release.sh): this job sends the release's
+# identity (commit and two image digests) over the tailnet with the environment's SSH key, which
+# can do nothing else there. The host renders the compose from its own installed template, so a
+# key picks which release runs, never what it runs as. Then this job checks the address the host
+# reports, from outside. A release that does not come up is rolled back by the host first.
 #
 # Rolling back does not go through here: `ssh boop-beep sudo opengym-release rollback <env>`
 # takes about 4 s (docs/BRINDLE_DEPLOY.md).
@@ -17,7 +18,7 @@ on:
         type: string
         required: true
       ref:
-        description: The release's commit; its deploy/ configuration is what gets deployed
+        description: The release's commit (release.json must name it)
         type: string
         required: true
       bootstrap:
@@ -45,20 +46,23 @@ jobs:
       ENV_NAME: ${{ inputs.environment }}
       BOOTSTRAP: ${{ inputs.bootstrap }}
     steps:
+      # The tooling of the calling workflow's commit (main), so an earlier release is deployed the
+      # current way; only its identity comes from release.json.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ inputs.ref }}
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: release
-      - name: The release is this commit
+      - name: The release is the one asked for
+        env:
+          WANT: ${{ inputs.ref }}
         run: |
-          test "$(jq -r .sha release.json)" = "$(git rev-parse HEAD)" \
-            || { echo "::error::release.json is for $(jq -r .sha release.json), the checkout is $(git rev-parse HEAD)"; exit 1; }
+          test "$(jq -r .sha release.json)" = "$WANT" \
+            || { echo "::error::release.json is for $(jq -r .sha release.json), not $WANT"; exit 1; }
       - name: Where ${{ inputs.environment }} answers (exposure in deploy/environments.json)
         id: where
         run: node scripts/deploy/coolify.mjs describe "$ENV_NAME" | tee -a "$GITHUB_OUTPUT"
@@ -74,12 +78,12 @@ jobs:
           BOOP_BEEP_KNOWN_HOSTS: ${{ vars.BOOP_BEEP_KNOWN_HOSTS }}
         run: |
           if [ "$BOOTSTRAP" = true ]; then set -- --bootstrap; fi
-          node scripts/deploy/coolify.mjs plan "$ENV_NAME" release.json "$@" \
-            | scripts/deploy/ssh-release.sh deploy "$ENV_NAME" | tee deploy.jsonl
+          jq -c '{sha, api, web, run_id}' release.json \
+            | scripts/deploy/ssh-release.sh deploy "$ENV_NAME" "$@" | tee deploy.jsonl
       - name: Check it from outside Boop Beep
         run: |
           if [ "$BOOTSTRAP" = true ]; then set -- --bootstrap; fi
-          node scripts/deploy/coolify.mjs verify "$ENV_NAME" release.json "$@"
+          node scripts/deploy/coolify.mjs verify "$ENV_NAME" release.json --url "$(tail -1 deploy.jsonl | jq -r .url)" "$@"
       - name: Summary
         if: always()
         run: |

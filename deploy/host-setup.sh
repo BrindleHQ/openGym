@@ -13,6 +13,8 @@
 #   /etc/opengym/deploy-<env>.pub    optional: the public key GitHub deploys <env> with
 # Once:
 #   /usr/local/bin/opengym-release   the release tool (deploy/opengym-release.sh), root-owned
+#   /usr/local/lib/opengym           what it renders each environment from: the compose template,
+#                                    deploy/environments.json and the renderer, from this checkout
 #   /etc/opengym/coolify-token       a Coolify API token (read, write, deploy), root only
 #   user opengym-deploy              can only run `opengym-release --ssh <env>`, one env per key
 set -euo pipefail
@@ -24,6 +26,10 @@ envs=deploy/environments.json
 install -d -m 755 -o root -g root /srv/opengym
 install -d -m 700 -o root -g root /etc/opengym
 install -m 755 -o root -g root deploy/opengym-release.sh /usr/local/bin/opengym-release
+install -d -m 755 -o root -g root /usr/local/lib/opengym/deploy /usr/local/lib/opengym/scripts/deploy
+install -m 644 -o root -g root deploy/coolify-compose.yml deploy/environments.json /usr/local/lib/opengym/deploy/
+install -m 644 -o root -g root scripts/deploy/coolify.mjs /usr/local/lib/opengym/scripts/deploy/
+docker pull -q "$(sed -n 's/^NODE_IMAGE=//p' deploy/opengym-release.sh)" >/dev/null
 [ -s /etc/opengym/coolify-token ] || echo "warning: /etc/opengym/coolify-token is missing; opengym-release needs it" >&2
 
 id opengym-deploy >/dev/null 2>&1 || useradd --system --create-home --shell /bin/sh opengym-deploy

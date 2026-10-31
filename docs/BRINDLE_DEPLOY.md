@@ -34,10 +34,14 @@ Each environment's `exposure` in `deploy/environments.json` decides who can reac
 - `"public"`: anyone on the internet, at `https://<public.host>` on `brindle.to`, through the
   Cloudflare tunnel and a Coolify domain. Invite-only and passkeys still apply.
 
-To switch, change that one word in a pull request. The deploy script, the deploy jobs (which join
-the tailnet only for a tailnet environment), the environment link in GitHub and `uptime.yml` all
-follow it. The tailnet address keeps answering in public mode, for checks, but sign-in belongs to
-one address only.
+To switch, change that one word in a pull request and merge it. Boop Beep renders every deploy
+from its own installed copy of `deploy/` (see "Releases"), so then, on Boop Beep, rerun
+`sudo deploy/host-setup.sh staging production` from `main` and redeploy the live release
+(`ssh boop-beep sudo opengym-release history <env>`, then
+`jq -c '{sha,api,web}' < <that release's release.json> | ssh boop-beep sudo opengym-release deploy <env>`,
+or the next merge). The uptime check and the GitHub environment link follow the repository. The
+tailnet address keeps answering in public mode, for checks, but sign-in belongs to one address
+only.
 
 **Switch before the environment has accounts.** A passkey works only on the hostname it was made
 for, so switching later locks every profile out. If you must switch afterwards, give each person a
@@ -93,25 +97,33 @@ rollback ────────> ssh boop-beep sudo opengym-release rollback p
   and `opengym-web` once, pulls them back by digest, runs `scripts/deploy/smoke.sh`, and saves
   `release.json` (the commit and both digests) as the run's `release` artifact for 90 days.
   Nothing is rebuilt after that.
-- **A deploy** (`.github/workflows/deploy.yml`, for staging and then production) renders a plan
-  from the release's own commit (`scripts/deploy/coolify.mjs plan`: the compose for the
-  environment, its settings and what it must show when live), joins the tailnet, and sends the
-  plan over SSH to **`opengym-release`** on Boop Beep with the environment's own key. That key can
-  run `opengym-release` for its environment and nothing else. The job then checks the address
-  from outside (`coolify.mjs verify`).
+- **A deploy** (`.github/workflows/deploy.yml`, for staging and then production) joins the
+  tailnet and sends the release's identity (commit and two digests, nothing else) over SSH to
+  **`opengym-release`** on Boop Beep, with the environment's own key. That key can run
+  `opengym-release` for its environment and nothing else. The host renders the compose itself
+  (`coolify.mjs plan`, in a sandboxed node container, from `/usr/local/lib/opengym`, which
+  `host-setup.sh` installs from a reviewed checkout): a key chooses which release runs, never
+  what it runs as. The job then checks the address the host reports, from outside.
 - **`opengym-release`** (`deploy/opengym-release.sh`, installed by `host-setup.sh`) does the
   deploy on the host:
   - one operation per environment at a time (a lock: a second deploy waits);
-  - it uploads the compose to the environment's Coolify service, has Coolify start it, and waits
-    for Coolify's own record of that run. Coolify does not queue compose deploys or report their
+  - it waits until Coolify runs nothing else for the service, uploads the compose, has Coolify
+    start it, and waits for Coolify's own record of that run. Coolify does not queue compose deploys or report their
     end over its API, and two overlapping runs once took staging down for five minutes;
   - the new release must then be healthy and serve its commit (`release.json`) with the planned
     `invite_only` and `allow_guest`. If not, it **restores the release that was live** and fails;
   - it keeps what Coolify generated as the release's snapshot: the last 10 per environment, in
     `/srv/opengym/<env>/releases/`.
-- **A rollback** starts a kept snapshot directly with docker compose. Nothing is built, pulled
-  or queued, and Coolify is told afterwards. Measured on staging: **3.9 s** on the host, 4.2 s
-  from Devbox, with the site unavailable for 3.5 s.
+- **A rollback** tells Coolify first, then starts a kept snapshot directly with docker compose.
+  Nothing is built, pulled or queued. Measured on staging: **4.3 s** on the host, 4.8 s from
+  Devbox, with the site unavailable for 2.5 s. A broken release is undone in about 5 s.
+
+Don't use Coolify's deploy, restart or stop buttons for openGym: they skip the lock. Because
+Coolify always holds the release the tool last made live, a Coolify run that slips in starts that
+same release, and the tool checks the result again once Coolify is idle. It was tested with
+restarts fired at the same moment as rollbacks. `opengym-release status` shows the recorded
+release next to what is actually serving; if they ever differ, `opengym-release rollback <env>
+<recorded id>` puts the recorded one back.
 
 openGym's API keeps its data in memory and in files, so two copies may never run at once. That
 is why there is no Kamal-style overlap: the old containers stop, then the new ones start. A
@@ -127,8 +139,8 @@ ssh boop-beep sudo opengym-release status production       # what is live, and w
 ssh boop-beep sudo opengym-release history production      # the kept releases, newest first
 ssh boop-beep sudo opengym-release rollback production     # back to the release before the live one
 ssh boop-beep sudo opengym-release rollback production 20261031T195648Z-28a6f29   # or a named one
-# deploy a release by hand (CI does this): a plan on stdin
-node scripts/deploy/coolify.mjs plan production release.json | ssh boop-beep sudo opengym-release deploy production
+# deploy a release by hand (CI does this): its identity on stdin
+jq -c '{sha, api, web}' release.json | ssh boop-beep sudo opengym-release deploy production
 ```
 
 A rollback needs no approval: it only goes back to a release production has already run. The
@@ -138,7 +150,8 @@ For a release older than the ten kept on the host, run **Deploy an earlier relea
 (`promote.yml`) with the `run_id` of its Tests run (artifacts last 90 days). Older still, the
 images are in GHCR as `sha-<commit>`: write a `release.json` with the digests from
 `docker buildx imagetools inspect ghcr.io/brindlehq/opengym-api:sha-<commit>` and deploy it by
-hand as above.
+hand as above. "Deploy an earlier release" always uses the current tooling; only the release's
+identity comes from the old run.
 
 **A rollback does not roll back data.** openGym has no schema migrations: the profile is one JSON
 document per user, and older code ignores fields it does not know. So a server image can go back
@@ -261,8 +274,11 @@ to the release before it.
   forced command runs `opengym-release --ssh <env>`: the staging key cannot touch production,
   and neither can run anything else (`deploy/host-setup.sh`). The host key is pinned
   (`BOOP_BEEP_KNOWN_HOSTS`). The only Coolify token is in `/etc/opengym/coolify-token`, root only.
-- `opengym-release` is installed by hand from a reviewed checkout (`host-setup.sh`), so a commit
-  cannot change what runs as root on the host.
+- `opengym-release`, the compose template and `environments.json` it renders from are installed
+  by hand from a reviewed checkout (`host-setup.sh`), so a commit or a deploy key cannot change
+  what runs as root on the host, or what a container is allowed to mount. Rendering runs in the
+  pinned `node:22.23.4-alpine` image with no network and a read-only filesystem, never with a
+  user-installed node.
 - Both environments are tailnet-only: no Coolify domain, no tunnel route, the web container bound
   to `127.0.0.1` on Boop Beep, and `tailscale serve` (never Funnel) in front. The deploy and uptime
   jobs join the tailnet as ephemeral `tag:ci` nodes with an OAuth client
@@ -290,7 +306,8 @@ from Gym visual, or remove the media.
    directories, the `tailscale serve` endpoints, the release tool and the `opengym-deploy` user.
    Before the first run, put a Coolify token (read, write, deploy) in `/etc/opengym/coolify-token`
    and each environment's deploy public key in `/etc/opengym/deploy-<env>.pub`. Rerun it whenever
-   `deploy/opengym-release.sh` changes.
+   anything under `deploy/` or `scripts/deploy/coolify.mjs` changes: the host deploys from its
+   installed copy, not from the commit being deployed.
 2. In Coolify: project **openGym** with environments `staging` and `production`. Create the
    services with `scripts/deploy/coolify.mjs provision <env> release.json` (any valid record;
    the first deploy replaces the images; it needs `COOLIFY_URL`, `COOLIFY_TOKEN`,

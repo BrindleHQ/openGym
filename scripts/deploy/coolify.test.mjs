@@ -89,6 +89,7 @@ test('a plan carries exactly what opengym-release checks and runs', () => {
   const plan = buildPlan(template, 'production', cfg, { ...release, run_id: 42 });
   // The same fields deploy/opengym-release.sh validates before it touches anything.
   assert.equal(plan.env, 'production');
+  assert.equal(plan.url, address(cfg).url);
   assert.deepEqual(plan.release, { sha: release.sha, api: release.api, web: release.web, run_id: '42' });
   assert.equal(typeof plan.docker_compose_raw, 'string');
   assert.equal(Buffer.from(plan.docker_compose_raw, 'base64').toString(), renderCompose(template, 'production', cfg, release));
