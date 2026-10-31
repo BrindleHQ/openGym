@@ -35,6 +35,8 @@ All settings live in `.env`; [`.env.example`](../.env.example) explains each one
 
 | Guide | Read it when |
 |---|---|
+| [Running openGym for Brindle](BRINDLE_DEPLOY.md) | Our environments, CI/CD, releases, backups and rollback (BrindleHQ fork) |
+| [One workout, end to end](dev/WORKOUT_WALKTHROUGH.md) | A finished workout traced through the app, API, storage, sync, tests and deploy |
 | [Contributing](../CONTRIBUTING.md) | Before your first pull request: setup, guidelines, what CI checks |
 | [Architecture](ARCHITECTURE.md) | You want the map: how the app, server, phones and watch fit together, with diagrams |
 | [App stores and releases](APP_STORES.md) | You're shipping a release: the APK, Google Play and the App Store |
