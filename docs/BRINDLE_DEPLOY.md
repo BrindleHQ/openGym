@@ -9,7 +9,7 @@ only our deployment.
 | | Development | Staging | Production |
 |---|---|---|---|
 | Where | Devbox | Boop Beep, Coolify project **openGym**, environment `staging` | Boop Beep, Coolify project **openGym**, environment `production` |
-| Address | `http://localhost:8080` (compose) or `:5173` (Vite) | <https://opengym-staging.brindle.to> | <https://opengym.brindle.co> |
+| Address | `http://localhost:8080` (compose) or `:5173` (Vite) | <https://opengym-staging.brindle.to> | <https://opengym.brindle.to> |
 | Data | `./data` in your checkout | `/srv/opengym/staging/data` | `/srv/opengym/production/data` |
 | Backups | none | `/srv/opengym/staging/backups`, nightly 03:17 UTC, 7 days | `/srv/opengym/production/backups`, nightly 02:47 UTC, 30 days |
 | Deployed by | you, by hand | every green push to `main`, automatically | `Promote to production`, by hand, with approval |
@@ -151,7 +151,7 @@ sudo mv /srv/opengym/production/data /srv/opengym/production/data.before-restore
 sudo mv "$scratch/backup/opengym-data" /srv/opengym/production/data
 sudo chown -R 10001:10001 /srv/opengym/production/data && sudo chmod 700 /srv/opengym/production/data
 sudo rm -rf "$scratch"
-# Start the service in Coolify, then check https://opengym.brindle.co/api/health.
+# Start the service in Coolify, then check https://opengym.brindle.to/api/health.
 ```
 
 **Off-host copy: not set up yet.** All archives are on Boop Beep's one disk. If that disk fails,
@@ -182,23 +182,18 @@ Production is prepared but has never run: the `opengym-production` service exist
 with placeholder images and is stopped, and `/srv/opengym/production/{data,backups}` exist and
 are empty. To bring it up:
 
-1. **Make `opengym.brindle.co` resolve.** On 2026-10-31 `brindle.co` was delegated to Linode name
-   servers that refuse every query for it, so no record under it resolves. Either:
-   - move `brindle.co` to the Cloudflare account that serves `brindle.to`, then add a public
-     hostname `opengym.brindle.co` to the existing tunnel, pointing at `http://localhost:80`
-     (the same target as `*.brindle.to`); or
-   - serve production on a `brindle.to` name instead: change `production.host` in
-     `deploy/environments.json` (and the URL in `promote.yml` and `uptime.yml`) in a pull
-     request. Do this before step 3. A passkey cannot move hostnames.
+1. Nothing to do for DNS: `opengym.brindle.to` is covered by the `*.brindle.to` record and the
+   tunnel route to `http://localhost:80` that every Brindle app on Boop Beep uses. Check that
+   `https://opengym.brindle.to` answers with Traefik's `404 page not found` before you start.
 2. Merge to `main`, and wait for the Tests run to deploy staging.
 3. Run **Promote to production** with that run's ID and **bootstrap** ticked. Approve it.
-4. Open <https://opengym.brindle.co> at once and create the owner profile. The first profile
+4. Open <https://opengym.brindle.to> at once and create the owner profile. The first profile
    becomes the admin.
 5. Run **Promote to production** again, same run ID, bootstrap off, so the instance is
-   invite-only again. Check that `https://opengym.brindle.co/api/config` shows
+   invite-only again. Check that `https://opengym.brindle.to/api/config` shows
    `"invite_only":true`.
 6. Pair the iPhone app: on the website, Settings, Account, Pair the mobile app. In the app,
-   enter the server address `https://opengym.brindle.co` and the code.
+   enter the server address `https://opengym.brindle.to` and the code.
 7. Set the repository variable `PRODUCTION_LIVE` to `true` (uptime checks), and run
    `sudo deploy/restore-test.sh production` once the first nightly archive exists.
 

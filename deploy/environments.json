@@ -8,7 +8,7 @@
     "backupRetentionDays": 7
   },
   "production": {
-    "host": "opengym.brindle.co",
+    "host": "opengym.brindle.to",
     "rpName": "openGym",
     "inviteOnly": true,
     "allowGuest": false,

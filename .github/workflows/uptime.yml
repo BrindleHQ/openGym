@@ -24,7 +24,7 @@ jobs:
           - env: staging
             host: opengym-staging.brindle.to
           - env: production
-            host: opengym.brindle.co
+            host: opengym.brindle.to
     steps:
       - name: ${{ matrix.env }} answers and can write its data
         if: matrix.env != 'production' || vars.PRODUCTION_LIVE == 'true'
