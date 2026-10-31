@@ -79,7 +79,7 @@ jobs:
     timeout-minutes: 20
     environment:
       name: production
-      url: https://opengym.brindle.to
+      url: ${{ steps.where.outputs.url }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -91,6 +91,17 @@ jobs:
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: release
+      - name: Where production answers (exposure in deploy/environments.json)
+        id: where
+        run: node scripts/deploy/coolify.mjs describe production | tee -a "$GITHUB_OUTPUT"
+      # A tailnet environment is reachable only on the tailnet: join it as an ephemeral tag:ci
+      # node (the tailnet policy lets tag:ci reach only openGym's two ports on Boop Beep).
+      - uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+        if: steps.where.outputs.exposure == 'tailnet'
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
       - name: Deploy and verify production
         env:
           COOLIFY_URL: ${{ vars.COOLIFY_URL }}

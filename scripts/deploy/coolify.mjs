@@ -18,9 +18,6 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const IMAGE = { api: 'ghcr.io/brindlehq/opengym-api', web: 'ghcr.io/brindlehq/opengym-web' };
-// Coolify variables the compose file reads as ${NAME}. Literal: Coolify writes them to the
-// service's .env single-quoted, so compose passes the `$` through to nginx untouched.
-export const SERVICE_ENV = [{ key: 'CF_CONNECTING_IP', value: '$http_cf_connecting_ip', is_literal: true }];
 
 export function validateRelease(release) {
   const problems = [];
@@ -35,22 +32,57 @@ export function validateRelease(release) {
   return release;
 }
 
+const isPort = p => Number.isInteger(p) && p >= 1 && p <= 65535;
+const isHost = h => typeof h === 'string' && /^[a-z0-9.-]+$/.test(h);
+
 export function environmentConfig(environments, env) {
   const cfg = environments[env];
   if (!cfg) throw new Error(`Unknown environment "${env}" (deploy/environments.json has ${Object.keys(environments).join(', ')})`);
-  if (!/^[a-z0-9.-]+$/.test(cfg.host)) throw new Error(`${env}: host "${cfg.host}" is not a bare hostname`);
+  if (!['tailnet', 'public'].includes(cfg.exposure)) throw new Error(`${env}: exposure must be "tailnet" or "public"`);
+  if (!isHost(cfg.tailnet?.host) || !isPort(cfg.tailnet?.port)) throw new Error(`${env}: tailnet needs a bare host and a port`);
+  if (!isHost(cfg.public?.host)) throw new Error(`${env}: public needs a bare host`);
+  if (!isPort(cfg.localPort)) throw new Error(`${env}: localPort must be a port number`);
   if (!Number.isInteger(cfg.backupRetentionDays) || cfg.backupRetentionDays < 1) throw new Error(`${env}: backupRetentionDays must be a positive integer`);
   if (!/^\S+ \S+ \S+ \S+ \S+$/.test(cfg.backupCron)) throw new Error(`${env}: backupCron must be a five-field cron expression`);
   return cfg;
 }
 
+// Where an environment answers, from its `exposure`:
+//   tailnet  https://<tailnet.host>:<tailnet.port>, via `tailscale serve` on Boop Beep only
+//   public   https://<public.host>, via the Cloudflare tunnel and a Coolify (Traefik) domain
+// The tailnet address keeps working in public mode too (the loopback port and tailscale serve
+// stay), but passkeys and sign-in belong to the one address in `url`. Switching an environment
+// that already has accounts locks their passkeys out (docs/BRINDLE_DEPLOY.md).
+export function address(cfg) {
+  if (cfg.exposure === 'public') {
+    return {
+      exposure: 'public', host: cfg.public.host, url: `https://${cfg.public.host}`,
+      coolifyDomain: `http://${cfg.public.host}:8080`,
+      // Cloudflare sets this header itself, so the sign-in throttle can tell visitors apart.
+      cfConnectingIp: '$http_cf_connecting_ip',
+    };
+  }
+  return {
+    exposure: 'tailnet', host: cfg.tailnet.host, url: `https://${cfg.tailnet.host}:${cfg.tailnet.port}`,
+    coolifyDomain: '', cfConnectingIp: '',
+  };
+}
+
+// Coolify variables the compose file reads as ${NAME}. Literal: Coolify writes them to the
+// service's .env single-quoted, so compose passes a `$` through to nginx untouched (Coolify reads
+// any compose value starting with `$` as a variable of its own, so it cannot go in the file).
+export const serviceEnv = where => [{ key: 'CF_CONNECTING_IP', value: where.cfConnectingIp, is_literal: true }];
+
 export function renderCompose(template, env, cfg, release, { bootstrap = false } = {}) {
   const flag = v => (v ? '1' : '0');
+  const where = address(cfg);
   const values = {
     API_IMAGE: release.api,
     WEB_IMAGE: release.web,
     ENV: env,
-    HOST: cfg.host,
+    HOST: where.host,
+    ORIGIN: where.url,
+    LOCAL_PORT: String(cfg.localPort),
     RP_NAME: cfg.rpName,
     INVITE_ONLY: flag(cfg.inviteOnly && !bootstrap),
     ALLOW_GUEST: flag(cfg.allowGuest),
@@ -128,16 +160,16 @@ export function publicMismatch(want, config) {
   return off.length ? off.map(k => `${k} is ${config?.[k]}, want ${want[k]}`).join(', ') : null;
 }
 
-async function publicChecks(host, release, want, request = fetch) {
+async function publicChecks(base, release, want, request = fetch) {
   const bust = `?t=${Date.now()}`;
-  const rel = await request(`https://${host}/release.json${bust}`, { headers: { 'Cache-Control': 'no-cache' } });
+  const rel = await request(`${base}/release.json${bust}`, { headers: { 'Cache-Control': 'no-cache' } });
   if (!rel.ok) return { done: false, reason: `release.json HTTP ${rel.status}` };
   const served = await rel.json().catch(() => ({}));
   if (served.revision !== release.sha) return { done: false, reason: `serving ${served.revision || 'unknown'}, want ${release.sha}` };
-  const health = await request(`https://${host}/api/health${bust}`);
+  const health = await request(`${base}/api/health${bust}`);
   const body = await health.json().catch(() => ({}));
   if (!health.ok || body.ok !== true || body.writable !== true) return { done: false, reason: `api/health HTTP ${health.status} ${JSON.stringify(body)}` };
-  const config = await (await request(`https://${host}/api/config${bust}`)).json().catch(() => ({}));
+  const config = await (await request(`${base}/api/config${bust}`)).json().catch(() => ({}));
   const off = publicMismatch(want, config);
   if (off) return { done: false, reason: `old configuration still answering: ${off}` };
   return { done: true, ok: true, users: body.users };
@@ -155,8 +187,14 @@ const b64 = s => Buffer.from(s, 'utf8').toString('base64');
 
 async function main(argv) {
   const [cmd, env, releasePath, ...flags] = argv;
+  if (cmd === 'describe' && env) {
+    // For workflows: where this environment answers, as GITHUB_OUTPUT lines.
+    const environments = JSON.parse(fs.readFileSync(path.join(ROOT, 'deploy/environments.json'), 'utf8'));
+    const where = address(environmentConfig(environments, env));
+    return void process.stdout.write(`exposure=${where.exposure}\nurl=${where.url}\n`);
+  }
   if (!['render', 'provision', 'deploy'].includes(cmd) || !env || !releasePath) {
-    console.error('usage: coolify.mjs render|provision|deploy <env> <release.json> [--bootstrap]');
+    console.error('usage: coolify.mjs render|provision|deploy <env> <release.json> [--bootstrap]\n       coolify.mjs describe <env>');
     process.exit(2);
   }
   const bootstrap = flags.includes('--bootstrap');
@@ -165,7 +203,8 @@ async function main(argv) {
   if (cmd === 'render') return void process.stdout.write(compose);
 
   const api = coolifyClient({ url: process.env.COOLIFY_URL, token: process.env.COOLIFY_TOKEN });
-  const urls = [{ name: 'web', url: `http://${cfg.host}:8080` }];
+  const where = address(cfg);
+  const urls = [{ name: 'web', url: where.coolifyDomain }];
 
   if (cmd === 'provision') {
     const { COOLIFY_PROJECT_UUID: project_uuid, COOLIFY_SERVER_UUID: server_uuid } = process.env;
@@ -175,7 +214,7 @@ async function main(argv) {
       project_uuid, server_uuid, environment_name: env, instant_deploy: false,
       docker_compose_raw: b64(compose), urls,
     });
-    await api('PATCH', `services/${made.uuid}/envs/bulk`, { data: SERVICE_ENV });
+    await api('PATCH', `services/${made.uuid}/envs/bulk`, { data: serviceEnv(where) });
     console.log(`created service ${made.uuid}; set COOLIFY_SERVICE_UUID for the ${env} environment to it`);
     return;
   }
@@ -183,17 +222,17 @@ async function main(argv) {
   const uuid = process.env.COOLIFY_SERVICE_UUID;
   if (!uuid) throw new Error('COOLIFY_SERVICE_UUID is required');
   const started = new Date().toISOString();
-  console.log(`${env}: ${release.sha}\n  api ${release.api}\n  web ${release.web}${bootstrap ? '\n  bootstrap: INVITE_ONLY off for this deploy' : ''}`);
+  console.log(`${env} (${where.exposure}, ${where.url}): ${release.sha}\n  api ${release.api}\n  web ${release.web}${bootstrap ? '\n  bootstrap: INVITE_ONLY off for this deploy' : ''}`);
   const before = await api('GET', `services/${uuid}`);
   if (before.name !== `opengym-${env}`) throw new Error(`Service ${uuid} is "${before.name}", not opengym-${env}: refusing to deploy to the wrong environment`);
 
   await api('PATCH', `services/${uuid}`, { docker_compose_raw: b64(compose), urls });
-  await api('PATCH', `services/${uuid}/envs/bulk`, { data: SERVICE_ENV });
+  await api('PATCH', `services/${uuid}/envs/bulk`, { data: serviceEnv(where) });
   const queued = await api('POST', `deploy?uuid=${encodeURIComponent(uuid)}&force=false`);
   console.log(`  queued: ${JSON.stringify(queued.deployments || queued)}`);
 
   // A redeploy of the same digests can report healthy before the queued restart begins, so the
-  // check that matters is the public one: the new revision answering through Cloudflare.
+  // check that matters is the public one: the new revision answering at its tailnet address.
   let badSince = null;
   const state = await waitFor('containers', async () => {
     const s = serviceState(await api('GET', `services/${uuid}`));
@@ -211,16 +250,16 @@ async function main(argv) {
     return s;
   }, { timeoutMs: 8 * 60000 });
   const want = expectedPublic(cfg, { bootstrap });
-  const live = await waitFor('public endpoint', () => publicChecks(cfg.host, release, want), { timeoutMs: 5 * 60000 });
+  const live = await waitFor(where.url, () => publicChecks(where.url, release, want), { timeoutMs: 5 * 60000 });
 
   const result = {
-    environment: env, url: `https://${cfg.host}`, service: uuid, sha: release.sha,
+    environment: env, url: where.url, exposure: where.exposure, service: uuid, sha: release.sha,
     api: release.api, web: release.web, bootstrap, started, finished: new Date().toISOString(),
     containers: Object.fromEntries(Object.entries(state.apps).map(([n, a]) => [n, a.status])),
     users: live.users,
   };
   fs.writeFileSync('deployment-result.json', JSON.stringify(result, null, 2) + '\n');
-  console.log(`${env} is serving ${release.sha} at https://${cfg.host}`);
+  console.log(`${env} is serving ${release.sha} at ${where.url}`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

@@ -1,6 +1,9 @@
 {
   "staging": {
-    "host": "opengym-staging.brindle.to",
+    "exposure": "tailnet",
+    "tailnet": { "host": "boop-beep.tail5728d8.ts.net", "port": 9443 },
+    "public": { "host": "opengym-staging.brindle.to" },
+    "localPort": 3801,
     "rpName": "openGym (staging)",
     "inviteOnly": true,
     "allowGuest": false,
@@ -8,7 +11,10 @@
     "backupRetentionDays": 7
   },
   "production": {
-    "host": "opengym.brindle.to",
+    "exposure": "tailnet",
+    "tailnet": { "host": "boop-beep.tail5728d8.ts.net", "port": 8443 },
+    "public": { "host": "opengym.brindle.to" },
+    "localPort": 3800,
     "rpName": "openGym",
     "inviteOnly": true,
     "allowGuest": false,

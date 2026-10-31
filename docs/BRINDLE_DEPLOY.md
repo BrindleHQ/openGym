@@ -9,7 +9,9 @@ only our deployment.
 | | Development | Staging | Production |
 |---|---|---|---|
 | Where | Devbox | Boop Beep, Coolify project **openGym**, environment `staging` | Boop Beep, Coolify project **openGym**, environment `production` |
-| Address | `http://localhost:8080` (compose) or `:5173` (Vite) | <https://opengym-staging.brindle.to> | <https://opengym.brindle.to> |
+| Exposure | your machine | tailnet only | tailnet only |
+| Address | `http://localhost:8080` (compose) or `:5173` (Vite) | <https://boop-beep.tail5728d8.ts.net:9443> | <https://boop-beep.tail5728d8.ts.net:8443> |
+| Public address, if switched | none | `https://opengym-staging.brindle.to` | `https://opengym.brindle.to` |
 | Data | `./data` in your checkout | `/srv/opengym/staging/data` | `/srv/opengym/production/data` |
 | Backups | none | `/srv/opengym/staging/backups`, nightly 03:17 UTC, 7 days | `/srv/opengym/production/backups`, nightly 02:47 UTC, 30 days |
 | Deployed by | you, by hand | every green push to `main`, automatically | `Promote to production`, by hand, with approval |
@@ -20,6 +22,28 @@ openGym keeps its own secrets in its data directory: the session key (`secret`) 
 (`vapid.json`). So each environment's secrets live only in that environment's directory.
 
 Nothing that runs in production runs on Devbox, and Devbox holds no production data.
+
+## Tailnet or public: one setting
+
+Each environment's `exposure` in `deploy/environments.json` decides who can reach it:
+
+- `"tailnet"` (both, today): only devices on our Tailscale network. The web container listens
+  on a loopback port of Boop Beep, and `tailscale serve` puts HTTPS in front of it at
+  `https://<tailnet.host>:<tailnet.port>`. Nothing routes it from the internet. The iPhone app
+  syncs while Tailscale is on, and keeps logging offline otherwise.
+- `"public"`: anyone on the internet, at `https://<public.host>` on `brindle.to`, through the
+  Cloudflare tunnel and a Coolify domain. Invite-only and passkeys still apply.
+
+To switch, change that one word in a pull request. The deploy script, the deploy jobs (which join
+the tailnet only for a tailnet environment), the environment link in GitHub and `uptime.yml` all
+follow it. The tailnet address keeps answering in public mode, for checks, but sign-in belongs to
+one address only.
+
+**Switch before the environment has accounts.** A passkey works only on the hostname it was made
+for, so switching later locks every profile out. If you must switch afterwards, give each person a
+recovery code from inside the API container (`node recover.js "<name>"`, see SELF_HOSTING.md),
+which lets them add a passkey for the new address. Before going public, also turn on **Always Use
+HTTPS** and **HSTS** for `brindle.to` in Cloudflare, so a plain `http://` visit is upgraded.
 
 ## Daily development
 
@@ -68,7 +92,7 @@ merge to main ─> Tests ─> publish ──────────> deploy-sta
    - renders `deploy/coolify-compose.yml` with the values from `deploy/environments.json`;
    - uploads the result to the `opengym-staging` Coolify service and deploys it;
    - waits until the containers report healthy and run the recorded digests;
-   - waits until `https://opengym-staging.brindle.to/release.json` names the new commit,
+   - waits until `<address>/release.json` names the new commit,
      `/api/health` says the data directory is writable, and `/api/config` shows the rendered
      `invite_only` and `allow_guest`. Until Coolify restarts the containers, the old ones keep
      answering, so checking health alone could pass too early.
@@ -151,7 +175,7 @@ sudo mv /srv/opengym/production/data /srv/opengym/production/data.before-restore
 sudo mv "$scratch/backup/opengym-data" /srv/opengym/production/data
 sudo chown -R 10001:10001 /srv/opengym/production/data && sudo chmod 700 /srv/opengym/production/data
 sudo rm -rf "$scratch"
-# Start the service in Coolify, then check https://opengym.brindle.to/api/health.
+# Start the service in Coolify, then check <address>/api/health.
 ```
 
 **Off-host copy: not set up yet.** All archives are on Boop Beep's one disk. If that disk fails,
@@ -170,7 +194,8 @@ off-site, encrypted target is a decision for the owner (see the open items in th
   containers' own logs rotate at 5 files of 10 MB each. A failed deploy job prints the container
   states and where it stopped. Container logs stay in Coolify, because Actions logs in this
   public repository are public.
-- **Monitoring.** `uptime.yml` checks both addresses through Cloudflare every 30 minutes, and a
+- **Monitoring.** `uptime.yml` checks both addresses from outside Boop Beep every 30 minutes
+  (joining the tailnet for a tailnet environment), and a
   failure notifies you through GitHub. Production joins once the repository variable
   `PRODUCTION_LIVE` is `true`. Scheduled workflows stop after 60 days without repository
   activity; GitHub emails you before that happens. Coolify Sentinel already reports host CPU,
@@ -182,27 +207,27 @@ Production is prepared but has never run: the `opengym-production` service exist
 with placeholder images and is stopped, and `/srv/opengym/production/{data,backups}` exist and
 are empty. To bring it up:
 
-1. Nothing to do for DNS: `opengym.brindle.to` is covered by the `*.brindle.to` record and the
-   tunnel route to `http://localhost:80` that every Brindle app on Boop Beep uses. Check that
-   `https://opengym.brindle.to` answers with Traefik's `404 page not found` before you start.
+1. Make sure the Tailscale OAuth client exists (One-time setup, step 4). Without it the deploy
+   jobs cannot reach a tailnet environment to check it.
 2. Merge to `main`, and wait for the Tests run to deploy staging.
 3. Run **Promote to production** with that run's ID and **bootstrap** ticked. Approve it.
-4. Open <https://opengym.brindle.to> at once and create the owner profile. The first profile
-   becomes the admin.
+4. With Tailscale on, open <https://boop-beep.tail5728d8.ts.net:8443> at once and create the
+   owner profile. The first profile becomes the admin.
 5. Run **Promote to production** again, same run ID, bootstrap off, so the instance is
-   invite-only again. Check that `https://opengym.brindle.to/api/config` shows
-   `"invite_only":true`.
-6. Pair the iPhone app: on the website, Settings, Account, Pair the mobile app. In the app,
-   enter the server address `https://opengym.brindle.to` and the code.
+   invite-only again. Check that `<address>/api/config` shows `"invite_only":true`.
+6. Pair the iPhone app: on the website, Settings, Account, Pair the mobile app. In the app, enter
+   the server address `https://boop-beep.tail5728d8.ts.net:8443` and the code. Tailscale has to
+   be on on the phone for it to sync.
 7. Set the repository variable `PRODUCTION_LIVE` to `true` (uptime checks), and run
    `sudo deploy/restore-test.sh production` once the first nightly archive exists.
 
 ## Passkeys and hostnames
 
 A passkey works only on the exact hostname it was created for (`RP_ID`). `RP_ID` and `ORIGIN`
-come from `host` in `deploy/environments.json`. The passkeys made on staging do not work on
-production, and changing an environment's `host` later locks every account out of that
-environment. Decide the production hostname before the first account is created there.
+come from the environment's active address (`exposure` above). On the tailnet, staging and
+production share the hostname `boop-beep.tail5728d8.ts.net` on different ports, so a passkey made
+on one is offered on the other too. It does not work there, because that server has never seen
+it, and it is harmless. Changing an environment's address later locks every account out of it.
 
 Both environments start invite-only (`inviteOnly: true`, guests off). A fresh instance has no
 admin to issue the first invite, so its first deploy uses `--bootstrap`. The `bootstrap` input of
@@ -223,6 +248,11 @@ again without bootstrap.
 
   Coolify scopes tokens to a team, not to a service. So either token could change both services.
   The deploy script refuses to deploy to a service whose name is not `opengym-<env>`.
+- Both environments are tailnet-only: no Coolify domain, no tunnel route, the web container bound
+  to `127.0.0.1` on Boop Beep, and `tailscale serve` (never Funnel) in front. The deploy and uptime
+  jobs join the tailnet as ephemeral `tag:ci` nodes with an OAuth client
+  (`TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, repository secrets, never given to fork pull requests).
+  The tailnet policy should let `tag:ci` reach only ports 8443 and 9443 on Boop Beep.
 - The GHCR packages are private. The web image carries the Gym visual exercise media, which are
   licensed for use within openGym only (NOTICE.md). Root on Boop Beep is logged in to `ghcr.io`
   to pull them.
@@ -240,7 +270,8 @@ from Gym visual, or remove the media.
 
 ## One-time setup (already done; redo only to rebuild)
 
-1. On Boop Beep: `sudo deploy/host-setup.sh staging production`.
+1. On Boop Beep, from a checkout: `sudo deploy/host-setup.sh staging production`. It creates the
+   data and backup directories and the `tailscale serve` HTTPS endpoints.
 2. In Coolify: project **openGym** with environments `staging` and `production`. Create the
    services with `scripts/deploy/coolify.mjs provision <env> release.json` (any valid record;
    the first deploy replaces the images). Use a Coolify token with read, write and deploy. It
@@ -252,6 +283,14 @@ from Gym visual, or remove the media.
    - in each environment, the variable `COOLIFY_SERVICE_UUID` and the secret `COOLIFY_TOKEN`
      (one token per environment);
    - a ruleset on `main` that requires a pull request and the `tests-ok` check.
+4. In Tailscale (admin console):
+   - in the policy file, `"tagOwners": {"tag:ci": ["autogroup:admin"]}` and a grant that lets
+     `tag:ci` reach only Boop Beep's openGym ports, for example
+     `{"src": ["tag:ci"], "dst": ["100.108.36.43"], "ip": ["tcp:8443", "tcp:9443"]}`. If the policy
+     still has the default allow-all rule, tighten it, or `tag:ci` can reach everything for the
+     minutes a job runs;
+   - Settings, OAuth clients, a client with the **Auth Keys** write scope and the tag `tag:ci`;
+   - its ID and secret as repository secrets `TS_OAUTH_CLIENT_ID` and `TS_OAUTH_SECRET`.
 
 ## Syncing with upstream
 

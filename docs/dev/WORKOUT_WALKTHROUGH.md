@@ -52,8 +52,8 @@ fails if the spec and the routes in `server.js` stop matching.
 ## 4. The server: compare, then write atomically
 
 The browser loads the app from nginx in the web container, and nginx forwards `/api/` to the api
-container (`web/nginx.conf.template`, `location ^~ /api/`). In staging and production, Cloudflare
-and Traefik on Boop Beep come before nginx.
+container (`web/nginx.conf.template`, `location ^~ /api/`). In staging and production, `tailscale
+serve` on Boop Beep comes before nginx, or Cloudflare and Traefik for a public environment.
 
 `routes['PUT /api/data']` (`api/server.js:2472`) handles the request. The server is plain
 `node:http` with a table of routes, and there is no framework.
@@ -107,7 +107,8 @@ uid 10001, the user the api container runs as (`deploy/coolify-compose.yml`). Ea
    by digest (`scripts/deploy/smoke.sh`). It records the two digests in `release.json`.
 3. `deploy-staging` runs `scripts/deploy/coolify.mjs deploy staging release.json`. The script
    fills in `deploy/coolify-compose.yml` for staging and uploads it to Coolify. Then it waits
-   until `https://opengym-staging.brindle.to/release.json` reports the new commit.
+   until staging's address (`https://boop-beep.tail5728d8.ts.net:9443`) serves `release.json` with
+   the new commit.
 4. `promote.yml`, after approval, deploys the same digests to production.
 
 To watch a single push happen, open the browser's network tab while you finish a workout on

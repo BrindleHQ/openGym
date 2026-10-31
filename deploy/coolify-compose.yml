@@ -7,6 +7,10 @@
 #
 # openGym keeps its own secrets (session key, VAPID keys) inside the data directory, so the only
 # per-environment state is the two host directories below, created once by deploy/host-setup.sh.
+#
+# The address is __ORIGIN__ (`exposure` in deploy/environments.json). The web container always
+# listens on 127.0.0.1:__LOCAL_PORT__ of Boop Beep, behind `tailscale serve` (host-setup.sh); a
+# public environment also gets a Coolify domain, reached through the Cloudflare tunnel.
 services:
   api:
     image: __API_IMAGE__
@@ -18,13 +22,13 @@ services:
       - PORT=3000
       - DATA_DIR=/data
       - RP_ID=__HOST__
-      - ORIGIN=https://__HOST__
+      - ORIGIN=__ORIGIN__
       - RP_NAME=__RP_NAME__
       - FIRST_USER_ADMIN=1
       - INVITE_ONLY=__INVITE_ONLY__
       - ALLOW_GUEST=__ALLOW_GUEST__
       - COACH_DISABLED=1
-      - VAPID_SUBJECT=https://__HOST__
+      - VAPID_SUBJECT=__ORIGIN__
       # Only the web container can reach the API, and its nginx overwrites the forwarded headers.
       - TRUST_PROXY=1
     volumes:
@@ -47,14 +51,14 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    ports:
+      - "127.0.0.1:__LOCAL_PORT__:8080"
     environment:
       - NGINX_PORT=8080
       - BACKEND=api
       - PORT=3000
-      # Cloudflare (the tunnel) is in front and sets this header itself, so the sign-in throttle
-      # can tell visitors apart. nginx has to receive the literal `$http_cf_connecting_ip`, and
-      # Coolify reads any value starting with `$` as a variable of its own, so the deploy script
-      # stores it as a literal Coolify variable (SERVICE_ENV in scripts/deploy/coolify.mjs).
+      # Public: the visitor's address from Cloudflare, for the sign-in throttle. Tailnet: empty,
+      # which drops the header. Set by the deploy script (serviceEnv in scripts/deploy/coolify.mjs).
       - CF_CONNECTING_IP=${CF_CONNECTING_IP}
     # Through nginx to the API: green means the proxy and the API both answer.
     healthcheck:

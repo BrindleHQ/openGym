@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateRelease, environmentConfig, renderCompose, serviceState, expectedPublic, publicMismatch } from './coolify.mjs';
+import { validateRelease, environmentConfig, renderCompose, serviceState, expectedPublic, publicMismatch, address, serviceEnv } from './coolify.mjs';
 import { promotionProblems } from './promotion.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -26,28 +26,52 @@ test('a release record names both images by digest and the full commit', () => {
 
 test('environment config is checked before anything is rendered', () => {
   assert.throws(() => environmentConfig(environments, 'prod'), /Unknown environment/);
-  assert.throws(() => environmentConfig({ x: { ...environments.staging, host: 'https://x.example' } }, 'x'), /bare hostname/);
+  assert.throws(() => environmentConfig({ x: { ...environments.staging, exposure: 'lan' } }, 'x'), /exposure must be/);
+  assert.throws(() => environmentConfig({ x: { ...environments.staging, public: { host: 'https://x.example' } } }, 'x'), /public needs a bare host/);
   assert.throws(() => environmentConfig({ x: { ...environments.staging, backupRetentionDays: 0 } }, 'x'), /positive integer/);
+  assert.throws(() => environmentConfig({ x: { ...environments.staging, tailnet: { host: 'h', port: '9443' } } }, 'x'), /tailnet needs/);
 });
 
+const esc = s => s.replace(/[.]/g, '\\.');
 for (const env of ['staging', 'production']) {
-  test(`${env} renders with every placeholder filled and only its own paths`, () => {
-    const cfg = environmentConfig(environments, env);
-    const out = renderCompose(template, env, cfg, release);
-    assert.doesNotMatch(out, /__[A-Z_]+__/);
-    assert.match(out, new RegExp(`image: ${release.api.replace(/[.]/g, '\\.')}\n`));
-    assert.match(out, new RegExp(`image: ${release.web.replace(/[.]/g, '\\.')}\n`));
-    assert.match(out, new RegExp(`RP_ID=${cfg.host.replace(/[.]/g, '\\.')}\n`));
-    assert.match(out, new RegExp(`ORIGIN=https://${cfg.host.replace(/[.]/g, '\\.')}\n`));
-    const other = env === 'staging' ? 'production' : 'staging';
-    assert.doesNotMatch(out, new RegExp(`/srv/opengym/${other}/`), 'one environment never mounts the other\'s data');
-    assert.match(out, /INVITE_ONLY=1\n/);
-    assert.match(out, /COACH_DISABLED=1\n/);
-  });
+  for (const exposure of ['tailnet', 'public']) {
+    test(`${env} (${exposure}) renders with every placeholder filled and only its own paths`, () => {
+      const cfg = { ...environmentConfig(environments, env), exposure };
+      const where = address(cfg);
+      const out = renderCompose(template, env, cfg, release);
+      assert.doesNotMatch(out, /__[A-Z_]+__/);
+      assert.match(out, new RegExp(`image: ${esc(release.api)}\n`));
+      assert.match(out, new RegExp(`image: ${esc(release.web)}\n`));
+      assert.match(out, new RegExp(`RP_ID=${esc(where.host)}\n`));
+      assert.match(out, new RegExp(`ORIGIN=${esc(where.url)}\n`));
+      // Always on loopback: tailscale serve keeps the tailnet way in, whatever the exposure.
+      assert.match(out, new RegExp(`- "127\\.0\\.0\\.1:${cfg.localPort}:8080"`));
+      const other = env === 'staging' ? 'production' : 'staging';
+      assert.doesNotMatch(out, new RegExp(`/srv/opengym/${other}/`), 'one environment never mounts the other\'s data');
+      assert.match(out, /INVITE_ONLY=1\n/);
+      assert.match(out, /COACH_DISABLED=1\n/);
+    });
+  }
 }
 
-test('the two environments do not share a hostname', () => {
-  assert.notEqual(environments.staging.host, environments.production.host);
+test('exposure decides the address, the Coolify domain and the Cloudflare header', () => {
+  const cfg = environments.production;
+  const tailnet = address({ ...cfg, exposure: 'tailnet' });
+  assert.equal(tailnet.url, `https://${cfg.tailnet.host}:${cfg.tailnet.port}`);
+  // No Coolify domain: nothing routes it from the internet. No header to trust either.
+  assert.equal(tailnet.coolifyDomain, '');
+  assert.deepEqual(serviceEnv(tailnet), [{ key: 'CF_CONNECTING_IP', value: '', is_literal: true }]);
+  const pub = address({ ...cfg, exposure: 'public' });
+  assert.equal(pub.url, `https://${cfg.public.host}`);
+  assert.equal(pub.coolifyDomain, `http://${cfg.public.host}:8080`);
+  assert.equal(serviceEnv(pub)[0].value, '$http_cf_connecting_ip');
+});
+
+test('the two environments share neither an address nor a local port', () => {
+  for (const exposure of ['tailnet', 'public']) {
+    assert.notEqual(address({ ...environments.staging, exposure }).url, address({ ...environments.production, exposure }).url);
+  }
+  assert.notEqual(environments.staging.localPort, environments.production.localPort);
 });
 
 test('--bootstrap turns INVITE_ONLY off for that deploy only', () => {
