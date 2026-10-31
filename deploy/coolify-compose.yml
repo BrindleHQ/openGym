@@ -17,6 +17,9 @@ services:
     # No host account has this uid; /srv/opengym/<env>/data is 10001:10001, mode 700. The Coach
     # is off (COACH_DISABLED), and it is the only part of the API that needs root.
     user: "10001:10001"
+    # Node as PID 1 ignores SIGTERM, so every stop waited out Docker's 10 s timeout. Under an init
+    # it exits at once; safe, since every write is temp-then-rename (api/durable.js).
+    init: true
     restart: unless-stopped
     environment:
       - PORT=3000
@@ -42,6 +45,9 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+      # Probe every second until the first success, so a new container counts as healthy (and web
+      # starts behind it) within seconds, not at the first 30 s interval. Deploys and rollbacks wait on it.
+      start_interval: 1s
     logging:
       driver: json-file
       options:
@@ -70,6 +76,9 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+      # Probe every second until the first success, so a new container counts as healthy (and web
+      # starts behind it) within seconds, not at the first 30 s interval. Deploys and rollbacks wait on it.
+      start_interval: 1s
     logging:
       driver: json-file
       options:
