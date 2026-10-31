@@ -323,8 +323,7 @@ from the weeks in August and September 2026 when the project lived there.
 
 People have asked about this, so plainly: **openGym is developed with
 [Claude Code](https://claude.com/claude-code)**, Anthropic's coding agent. A large share of the
-code, tests and documentation is drafted in Claude Code sessions, and the repository carries a
-[`CLAUDE.md`](CLAUDE.md) with the project context those sessions start from.
+code, tests and documentation is drafted in Claude Code sessions.
 
 What that does and doesn't mean:
 

@@ -39,7 +39,6 @@ All settings live in `.env`; [`.env.example`](../.env.example) explains each one
 | [Architecture](ARCHITECTURE.md) | You want the map: how the app, server, phones and watch fit together, with diagrams |
 | [App stores and releases](APP_STORES.md) | You're shipping a release: the APK, Google Play and the App Store |
 | [scripts/](../scripts/README.md) | You want to know which build script does what |
-| [CLAUDE.md](../CLAUDE.md) | The same project context in the form Claude Code sessions start from |
 | [HTTP API](API.md) | You're touching routes; the OpenAPI spec is the source of truth |
 | [Roadmap](../ROADMAP.md) | You want to know what's planned and where your idea fits |
 | [Changelog](../CHANGELOG.md) | You want to know what changed in a release |
