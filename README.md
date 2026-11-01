@@ -128,6 +128,8 @@ if you want to try it before installing anything.
   any OpenAI-compatible endpoint, Ollama included).
 - An [MCP server](mcp/README.md) so an assistant like Claude Desktop can answer questions about your
   training history, and log a workout you describe to it. Local; not part of the Docker build.
+- An [agent CLI and skill](docs/AGENT_CLI.md) for shell-based agents to preview workouts and
+  manage routines, schedules and starting weights through your server. No MCP setup required.
 
 The full list of what changed release by release is in the [changelog](CHANGELOG.md).
 

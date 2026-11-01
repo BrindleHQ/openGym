@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenGym"
+  short_description: "Manage OpenGym routines through a compact CLI"
+  default_prompt: "Use $opengym to inspect, preview, and apply my workout routine changes."

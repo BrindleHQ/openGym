@@ -95,6 +95,9 @@ jobs:
               - '.github/workflows/test.yml'
               - 'scripts/ci/**'
               - 'mcp/**'
+              - 'agent/**'
+              - 'bin/**'
+              - '.agents/skills/opengym/**'
               - 'frontend/src/lib/**'
             images:
               - '.github/workflows/test.yml'
@@ -272,6 +275,8 @@ jobs:
           npx vitest run
           --reporter=default --reporter=json --outputFile.json=test-results.json
           --coverage --coverage.provider=v8 --coverage.reporter=json-summary
+      - name: Agent CLI and real API integration tests
+        run: node --test agent/*.test.js
       # The one check the vitest suite structurally cannot make: the MCP server is a bare node
       # process, but vitest resolves import.meta.glob, .jsx and ?raw happily. That is how a
       # Vite-only import reached a shared module with 33 green tests over a dead server.
