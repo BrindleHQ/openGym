@@ -37,7 +37,9 @@ env:
 
 jobs:
   changes:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 5
     permissions:
       contents: read
@@ -95,6 +97,9 @@ jobs:
               - '.github/workflows/test.yml'
               - 'scripts/ci/**'
               - 'mcp/**'
+              - 'agent/**'
+              - 'bin/**'
+              - '.agents/skills/opengym/**'
               - 'frontend/src/lib/**'
             images:
               - '.github/workflows/test.yml'
@@ -123,7 +128,9 @@ jobs:
   frontend:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -191,7 +198,9 @@ jobs:
   api:
     needs: changes
     if: needs.changes.outputs.api == 'true'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -246,7 +255,9 @@ jobs:
   mcp:
     needs: changes
     if: needs.changes.outputs.mcp == 'true'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -272,6 +283,8 @@ jobs:
           npx vitest run
           --reporter=default --reporter=json --outputFile.json=test-results.json
           --coverage --coverage.provider=v8 --coverage.reporter=json-summary
+      - name: Agent CLI and real API integration tests
+        run: node --test agent/*.test.js
       # The one check the vitest suite structurally cannot make: the MCP server is a bare node
       # process, but vitest resolves import.meta.glob, .jsx and ?raw happily. That is how a
       # Vite-only import reached a shared module with 33 green tests over a dead server.
@@ -295,7 +308,9 @@ jobs:
   catalogue:
     needs: changes
     if: needs.changes.outputs.catalogue == 'true'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -316,7 +331,9 @@ jobs:
   images:
     needs: changes
     if: needs.changes.outputs.images == 'true'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -368,27 +385,8 @@ jobs:
           ! docker run --rm opengym-api:published codex --version
           ! docker run --rm opengym-api:published bwrap --version
 
-      - name: the default image boots and serves, with no AI runtime in it
-        run: |
-          docker network create og
-          docker run -d --name api-default --network og --network-alias api -e DATA_DIR=/data -p 3000:3000 opengym-api:default
-          for i in $(seq 1 30); do
-            curl -fsS http://localhost:3000/api/config >/dev/null 2>&1 && break
-            sleep 1
-          done
-          curl -fsS http://localhost:3000/api/config | tee /dev/stderr | grep -q '"invite_only"'
-          docker run --rm opengym-api:default node -e \
-            'import("@anthropic-ai/claude-agent-sdk").then(()=>{console.error("AI runtime present in the default image");process.exit(1)},()=>process.exit(0))'
-
-      # The stack the way docker-compose.yml wires it: nginx in the web image proxies /api to
-      # the api container. A green api image and a green web image can still not talk.
-      - name: the web image serves the app and reaches the api through nginx
-        run: |
-          docker run -d --name web --network og -p 8080:80 opengym-web:ci
-          for i in $(seq 1 30); do curl -fsS http://localhost:8080/ >/dev/null 2>&1 && break; sleep 1; done
-          curl -fsS http://localhost:8080/ | grep -q 'id="root"'
-          curl -fsS http://localhost:8080/api/config | grep -q '"invite_only"'
-          docker rm -f web api-default
+      - name: the default api and web images boot and communicate without AI runtime
+        run: bash scripts/ci/image-smoke.sh
 
       - name: the coach image carries a runnable Agent SDK
         run: |
@@ -423,7 +421,9 @@ jobs:
   deploy-config:
     needs: changes
     if: needs.changes.outputs.deploy == 'true'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -433,6 +433,12 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: node --test "scripts/deploy/*.test.mjs"
+      - name: Install ShellCheck on the self-hosted runner
+        run: |
+          if ! command -v shellcheck >/dev/null; then
+            apt-get update
+            apt-get install -y --no-install-recommends shellcheck
+          fi
       - name: The deploy scripts parse and pass shellcheck
         run: shellcheck -S warning deploy/*.sh scripts/deploy/*.sh
       - name: Both environments render to a valid compose file
@@ -451,7 +457,9 @@ jobs:
   # (npm ci --omit=optional in api/Dockerfile). The weekly audit.yml checks the wider picture,
   # dev tooling, the Coach SDK and mcp/ included, on its own schedule outside this gate.
   deps-audit:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -471,7 +479,9 @@ jobs:
   report:
     needs: [frontend, api, mcp]
     if: always() && !cancelled()
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -500,7 +510,9 @@ jobs:
   tests-ok:
     needs: [changes, frontend, api, mcp, catalogue, images, deploy-config, deps-audit]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 2
     steps:
       - name: Every job passed or had nothing to check
@@ -525,7 +537,9 @@ jobs:
       !cancelled() && needs.tests-ok.result == 'success' &&
       github.event_name == 'push' && github.repository == 'BrindleHQ/openGym' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/ci-'))
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 30
     permissions:
       contents: read
