@@ -78,6 +78,28 @@ It passes when every job that had something to check passed:
 
 Merge when it is green. Nothing else is needed: staging, then production, follow.
 
+### Automated review (Lookout)
+
+Lookout, Brindle's pull request reviewer, also reviews open, non-draft pull requests on this
+repository. It runs on Boop Beep, tailnet only. Its dashboard, with every run, finding and
+reason, is at <https://boop-beep.tail5728d8.ts.net:12443>.
+
+- It reviews the pull request's exact base and head commits. One coding agent (Claude Code or
+  Codex) investigates the change in a disposable VM, and the other confirms or rejects each
+  finding in a fresh VM and session. A finding whose quoted code is not at the head is dropped.
+- A moderator then decides, and says why:
+  - **Publish**: no escalation factor fired. The confirmed findings, if any, are posted.
+  - **Needs a human**: by default, any of a suspected security, data-loss or critical finding;
+    the agents disagreeing; findings that could not be confirmed or tied to the code; 50 or more
+    added lines of code with no test changes; a change to CI, deployment, containers,
+    dependency manifests, keys or authentication code; more than 800 changed lines or 40 files.
+    The review is posted with these reasons.
+  - **Inconclusive**: the review itself failed or was cut short. Nothing is posted.
+- Lookout only ever comments. It never approves, requests changes or merges, and a clean review
+  is not a merge approval: merge on `tests-ok` and your own judgement, as above.
+- It posts only while the pull request is still at the commit it reviewed. Push a new commit and
+  the review of the old one stops; the new head is reviewed on the next poll.
+
 ## Releases, deploys and rollback
 
 The model is the one T3 Code, Cloudflare Workers, Vercel and Kamal use: every release is an
