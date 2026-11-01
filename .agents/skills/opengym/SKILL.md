@@ -1,6 +1,6 @@
 ---
 name: opengym
-description: Inspect OpenGym routines, preview workout prescriptions, and create or update routines, schedules, and starting weights through the CLI.
+description: Use when the user wants to inspect OpenGym routines, see what a workout will prescribe, change a routine or weekly schedule, or set starting weights through an agent.
 ---
 
 Run `node bin/opengym --help` from the OpenGym checkout. Use compact JSON results; keep full profiles and credentials outside model context. Read [the CLI guide](../../../docs/AGENT_CLI.md) for input formats or pairing setup.

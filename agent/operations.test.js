@@ -135,3 +135,28 @@ test('weight-only edits retain native exercise fields through apply',async()=>{
   const server=fake(s.state);await applyChange(cfg,p,server.options)
   assert.equal(server.doc.routines[0].ex[0].warmupSets,2)
 })
+test('weight-only apply preserves unchanged timed exercises in the same routine',async()=>{
+  const s=snapshot(),timed={id:'3238',sets:2,mode:'time',sec:30,note:'Native hold'}
+  s.state.routines[0].ex.push(timed)
+  const p=prepareWeights(s,{unit:'kg',updates:[{routine_id:'r1',position:1,weight:25}]})
+  const server=fake(s.state)
+  assert.equal((await applyChange(cfg,p,server.options)).verified,true)
+  assert.equal(server.doc.routines[0].ex[0].weight,25)
+  assert.deepEqual(server.doc.routines[0].ex[1],timed)
+  assert.deepEqual(server.doc.workouts,s.state.workouts)
+})
+test('plan preview refuses removals the API would restore before proposing a save',()=>{
+  const s=snapshot();Object.assign(s.state.routines[0].ex[0],{pyramid:[12,10,8],pyramidWeight:[20,22,24]})
+  const before=structuredClone(s)
+  assert.throws(()=>preparePlan(s,plan()),{code:'EINVAL',message:/API retains omitted native exercise fields/})
+  assert.deepEqual(s,before)
+})
+test('schedule-only changes reference existing routines without replacing prescriptions',async()=>{
+  const s=snapshot(),server=fake(s.state)
+  const p=preparePlan(s,{opengym_plan:1,unit:'kg',routines:[],week:{1:[],2:['r1']}})
+  assert.deepEqual(p.routines,[])
+  assert.equal((await applyChange(cfg,p,server.options)).verified,true)
+  assert.deepEqual(server.doc.week,{2:['r1']})
+  assert.deepEqual(server.doc.routines,s.state.routines)
+  assert.deepEqual(server.doc.workouts,s.state.workouts)
+})

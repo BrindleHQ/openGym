@@ -4,6 +4,7 @@ import { EXIDX, canonicalExId, registerCustom, isHold, isCardio, searchExercises
 import { buildSessionEntries } from '../frontend/src/lib/session-start.js'
 import { convertWeight } from '../frontend/src/lib/units.js'
 import { apiFetch } from '../mcp/src/api-client.js'
+import { keepUnknown } from '../api/sync-stamps.js'
 
 export function fail(code, message) { return Object.assign(new Error(message), { code }) }
 function check(ok, message) { if (!ok) throw fail('EINVAL', message) }
@@ -49,14 +50,14 @@ function validateExercise(e, state, from) {
   }
   return out
 }
-function validateRoutine(r, state, from) {
+function validateRoutine(r, state, from, previous = null) {
   keys(r, ['id','name','emoji','prog','ex','excludeFromProgression'], 'routine')
   text(r.id, 150, 'routine.id'); text(r.name, 150, 'routine.name')
   if (r.emoji !== undefined) text(r.emoji, 20, 'emoji')
   if (r.prog !== undefined) check(['off','linear','greyskull','double','triple'].includes(r.prog), 'unsupported routine progression')
   if (r.excludeFromProgression !== undefined) check(typeof r.excludeFromProgression === 'boolean', 'excludeFromProgression must be boolean')
   check(Array.isArray(r.ex) && r.ex.length > 0 && r.ex.length <= 40, 'routine needs 1–40 exercises')
-  return { ...r, ex: r.ex.map(e => validateExercise(e, state, from)) }
+  return { ...r, ex: r.ex.map((e,i) => previous && isDeepStrictEqual(e,previous.ex?.[i]) ? e : validateExercise(e, state, from)) }
 }
 function seal(value) { return createHash('sha256').update(JSON.stringify(value)).digest('hex') }
 function binding(snapshot) {
@@ -86,7 +87,7 @@ export function preparePlan(snapshot, input) {
   check(input.opengym_plan === 1, 'opengym_plan must be 1')
   const from = unit(input.unit)
   check(!input.customEx || (Array.isArray(input.customEx) && input.customEx.length === 0), 'create custom exercises in the app first; reference their IDs here')
-  check(Array.isArray(input.routines) && input.routines.length > 0 && input.routines.length <= 30, 'plan needs 1–30 routines')
+  check(Array.isArray(input.routines) && input.routines.length <= 30 && (input.routines.length > 0 || input.week !== undefined), 'plan needs 1–30 routines or an explicit week patch')
   const state = snapshot.state || { unit:from, routines:[], week:{}, workouts:[], customEx:[] }
   unit(state.unit || 'kg')
   const seen = new Set()
@@ -94,7 +95,10 @@ export function preparePlan(snapshot, input) {
     const validated = validateRoutine(r, state, from)
     check(!seen.has(r.id), 'duplicate routine ID'); seen.add(r.id)
     const before = (state.routines || []).find(x => x.id === r.id) || null
-    return { before, after:{ ...before, ...validated } }
+    const after = { ...before, ...validated }
+    const retained = keepUnknown({routines:before ? [before] : []}, {routines:[structuredClone(after)]}).routines[0]
+    check(isDeepStrictEqual(retained.ex,after.ex), `routine ${r.id}: the API retains omitted native exercise fields; use weights preview for load-only edits or edit advanced configuration in the app`)
+    return { before, after }
   })
   let week
   if (input.week !== undefined) {
@@ -182,11 +186,12 @@ export async function applyChange(config, change, options = {}) {
     const input = Object.fromEntries(Object.entries(c.after).filter(([k])=>['id','name','emoji','prog','ex','excludeFromProgression'].includes(k)))
     // Weight-only edits may carry native fields this CLI does not author. They may only be retained unchanged.
     input.ex = c.after.ex.map((e,i)=>{
+      if (isDeepStrictEqual(e,old.ex?.[i])) return e
       const known = ['id','sets','reps','repsMin','weight','restSec','prog','inc','dbLoad','bodyweight','note']
       for (const [k,v] of Object.entries(e)) if (!known.includes(k)) check(isDeepStrictEqual(v,old.ex?.[i]?.[k]), 'unsupported exercise field was changed')
       return Object.fromEntries(Object.entries(e).filter(([k])=>known.includes(k)))
     })
-    validateRoutine(input,next,change.base.unit)
+    validateRoutine(input,next,change.base.unit,old)
     for(const [k,v] of Object.entries(c.after)) if(!['id','name','emoji','prog','ex','excludeFromProgression'].includes(k)) check(isDeepStrictEqual(v,old[k]), 'unsupported routine field was changed')
     next.routines ||= []
     const index=next.routines.findIndex(r=>r.id===c.after.id)

@@ -52,9 +52,9 @@ Write a plan file with stable routine IDs that you own. An existing ID updates t
 
 `reps` is the range ceiling. The required `unit` applies to `weight` and optional load `inc`; these are converted into the profile's unit with OpenGym's conversion rules. Existing profile units and history stay unchanged. An empty profile starts in the input unit. Missing weights are not guessed: the app may use history or zero. `dbLoad` is `each`, `total`, or `as` for dumbbells/kettlebells. Use `bodyweight: true` for bodyweight work.
 
-Exercise fields: `id`, `sets`, `reps`, `repsMin`, `weight`, `restSec`, `prog`, `inc`, `dbLoad`, `bodyweight`, `note`. Routine fields: `id`, `name`, `emoji`, `prog`, `excludeFromProgression`, `ex`. Unknown fields and unsupported quantities are refused. Updating a routine replaces its exercise list; inspect removed fields/exercises in the diff. Native routine metadata is retained. Weight-only edits below retain all native exercise configuration.
+Exercise fields: `id`, `sets`, `reps`, `repsMin`, `weight`, `restSec`, `prog`, `inc`, `dbLoad`, `bodyweight`, `note`. Routine fields: `id`, `name`, `emoji`, `prog`, `excludeFromProgression`, `ex`. Unknown fields and unsupported quantities are refused. Updating a routine replaces its exercise list; inspect removed fields/exercises in the diff. Native routine metadata is retained. Preview refuses to remove native exercise fields the API would restore, such as pyramid configuration; edit those settings in the app. Weight-only edits below retain all native exercise configuration, including unchanged timed exercises in the same routine.
 
-The optional `week` is a day patch: 0=Sunday through 6=Saturday. Arrays contain routine IDs; an empty array makes that day a rest day. Unmentioned weekdays stay unchanged. Omitting `week` leaves the schedule unchanged. This edits the weekly grid, not rotations, floating queues, or individual date overrides.
+The optional `week` is a day patch: 0=Sunday through 6=Saturday. Arrays contain routine IDs; an empty array makes that day a rest day. Unmentioned weekdays stay unchanged. Omitting `week` leaves the schedule unchanged. Use `"routines": []` with `week` for a schedule-only edit. This edits the weekly grid, not rotations, floating queues, or individual date overrides.
 
 ```sh
 node bin/opengym plan preview --file plan.json --out change.json
