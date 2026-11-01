@@ -95,8 +95,9 @@ reason, is at <https://boop-beep.tail5728d8.ts.net:12443>.
     dependency manifests, keys or authentication code; more than 800 changed lines or 40 files.
     The review is posted with these reasons.
   - **Inconclusive**: the review itself failed or was cut short. Nothing is posted.
-- Lookout only ever comments. It never approves, requests changes or merges, and a clean review
-  is not a merge approval: merge on `tests-ok` and your own judgement, as above.
+- Lookout only ever comments, as the `brindle-lookout[bot]` GitHub App. It never approves,
+  requests changes or merges, and a clean review is not a merge approval: merge on `tests-ok`
+  and your own judgement, as above.
 - It posts only while the pull request is still at the commit it reviewed. Push a new commit and
   the review of the old one stops; the new head is reviewed on the next poll.
 
