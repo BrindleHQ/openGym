@@ -37,7 +37,9 @@ env:
 
 jobs:
   changes:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 5
     permissions:
       contents: read
@@ -126,7 +128,9 @@ jobs:
   frontend:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -194,7 +198,9 @@ jobs:
   api:
     needs: changes
     if: needs.changes.outputs.api == 'true'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -249,7 +255,9 @@ jobs:
   mcp:
     needs: changes
     if: needs.changes.outputs.mcp == 'true'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -300,7 +308,9 @@ jobs:
   catalogue:
     needs: changes
     if: needs.changes.outputs.catalogue == 'true'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -321,7 +331,9 @@ jobs:
   images:
     needs: changes
     if: needs.changes.outputs.images == 'true'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -428,7 +440,9 @@ jobs:
   deploy-config:
     needs: changes
     if: needs.changes.outputs.deploy == 'true'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -456,7 +470,9 @@ jobs:
   # (npm ci --omit=optional in api/Dockerfile). The weekly audit.yml checks the wider picture,
   # dev tooling, the Coach SDK and mcp/ included, on its own schedule outside this gate.
   deps-audit:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -476,7 +492,9 @@ jobs:
   report:
     needs: [frontend, api, mcp]
     if: always() && !cancelled()
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -505,7 +523,9 @@ jobs:
   tests-ok:
     needs: [changes, frontend, api, mcp, catalogue, images, deploy-config, deps-audit]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 2
     steps:
       - name: Every job passed or had nothing to check
@@ -530,7 +550,9 @@ jobs:
       !cancelled() && needs.tests-ok.result == 'success' &&
       github.event_name == 'push' && github.repository == 'BrindleHQ/openGym' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/ci-'))
-    runs-on: ubuntu-latest
+    runs-on:
+      group: OpenGym
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 30
     permissions:
       contents: read
