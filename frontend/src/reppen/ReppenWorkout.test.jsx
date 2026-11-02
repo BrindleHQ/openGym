@@ -306,4 +306,3 @@ describe('Reppen workout screens', () => {
     expect(reppenStore.getState().rejected).toEqual([])
   })
 })
-

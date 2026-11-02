@@ -36,7 +36,7 @@ describe('Reppen client', () => {
     const gateway = reppenClient({ base: () => '/reppen/', token: async () => { throw Object.assign(new Error('gateway unavailable'), { status: 502 }) } })
     await expect(gateway.history()).rejects.toMatchObject({ status: 0, code: 'offline' })
   })
-  it.each([['GET', 20000], ['POST', 60000]])('keeps the %s deadline active while the response body is stalled', async (method, timeout) => {
+  it.each([['GET', 20000], ['POST', 60000], ['CATALOG', 20000]])('keeps the %s deadline active while the response body is stalled', async (method, timeout) => {
     vi.useFakeTimers()
     try {
       let signal
@@ -47,7 +47,7 @@ describe('Reppen client', () => {
         }) }
       } })
       let result
-      const pending = (method === 'GET' ? client.history() : client.finish('w', 1)).catch(e => { result = e })
+      const pending = (method === 'CATALOG' ? client.exerciseCatalog() : method === 'GET' ? client.history() : client.finish('w', 1)).catch(e => { result = e })
       await vi.advanceTimersByTimeAsync(0)
       await vi.advanceTimersByTimeAsync(timeout - 1)
       expect(result).toBeUndefined()

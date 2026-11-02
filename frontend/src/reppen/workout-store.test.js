@@ -580,4 +580,3 @@ describe('Reppen store: two devices on one workout', () => {
     expect(laptop.getState().workout.revision).toBe(1)
   })
 })
-
