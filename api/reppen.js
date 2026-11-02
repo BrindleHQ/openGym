@@ -72,7 +72,10 @@ export function openKeyStore(file, { now = () => Date.now() } = {}) {
   };
   const published = t => set.keys.filter(k => k.retireAt === null || k.retireAt > t);
   // The newest key whose time has come. A key waiting out its lead is published but signs nothing.
-  const signing = t => published(t).filter(k => k.activeFrom <= t).sort((a, b) => b.activeFrom - a.activeFrom)[0];
+  // On an activeFrom tie (two rotations in one millisecond) the key added last wins: rotation has
+  // already scheduled every earlier key to retire.
+  const signing = t => published(t).filter(k => k.activeFrom <= t)
+    .reduce((best, k) => (!best || k.activeFrom >= best.activeFrom ? k : best), undefined);
 
   return {
     mint(sub, { issuer, audience }) {

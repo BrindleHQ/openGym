@@ -179,6 +179,18 @@ test('rotation with no lead signs with the new key at once and keeps the old one
   assert.equal((await h.cli('rotate', '--lead', '-1')).code, 1);
 });
 
+test('two rotations in the same millisecond sign with the key added last', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gym-reppen-keys-'));
+  try {
+    const now = 1_800_000_000_000;
+    const store = openKeyStore(path.join(dir, 'reppen-keys.json'), { now: () => now });
+    store.rotate(0);
+    const { kid: last } = store.rotate(0);
+    const signedWith = JSON.parse(Buffer.from(store.mint('u', { issuer: ISS, audience: AUD }).token.split('.')[0], 'base64url')).kid;
+    assert.equal(signedWith, last, 'the key the second rotation did not schedule to retire');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('the key store retires a key once its last token has expired, and refuses a damaged file without quoting it', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gym-reppen-keys-'));
   try {
