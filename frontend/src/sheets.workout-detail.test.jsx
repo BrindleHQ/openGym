@@ -149,6 +149,25 @@ describe('workout detail', () => {
     expect(toast).toHaveBeenCalledWith('Could not copy')
     delete document.execCommand
   })
+
+  // A workout a Reppen program ran (reppen/history.js) is shown, not edited: Reppen holds the record.
+  it('shows a Reppen workout read-only, and still lets it be deleted', () => {
+    const w = workout([{ id: lifts[0], target: null, sets: [done(100, 5)] }], { managed: { source: 'reppen', workoutId: 'r1', enrollmentId: 'e1', revision: 4 } })
+    useStore.setState({ S: { ...useStore.getState().S, workouts: [w] } })
+    workoutDetailSheet(w)
+    const host = mountTopSheet()
+    expect(host.querySelector('.wd-managed').textContent).toBe('Your Reppen program saved this workout. It cannot be changed here.')
+    for (const label of ['Edit workout', 'Change date & time', 'Change duration']) expect(button(host, label)).toBeUndefined()
+    expect(host.querySelector('textarea')).toBe(null)
+    expect(button(host, 'Copy as text')).toBeTruthy()
+    expect(button(host, 'Delete workout')).toBeTruthy()
+    // The same workout without the mark has every edit.
+    act(() => { mounted.splice(0).forEach(root => root.unmount()) })
+    workoutDetailSheet({ ...w, managed: undefined })
+    const plain = mountTopSheet()
+    expect(button(plain, 'Edit workout')).toBeTruthy()
+    expect(plain.querySelector('textarea')).toBeTruthy()
+  })
 })
 
 // #447: the workout as a Garmin .fit activity, saved as a download in the browser.

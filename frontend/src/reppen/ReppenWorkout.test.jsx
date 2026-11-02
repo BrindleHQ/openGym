@@ -93,6 +93,10 @@ describe('Reppen workout screens', () => {
     await click(button(host, 'Finish workout'))
     expect(wire.sent.at(-1)).toMatchObject({ method: 'POST', body: { expectedRevision: 6 } })
     expect(host.querySelector('.rp-finished').textContent).toContain('Next workout: B1')
+    // It is in OpenGym's own history too, once: the three squat sets; the bench set was cleared.
+    const copies = useStore.getState().S.workouts.filter(x => x.managed?.source === 'reppen')
+    expect(copies.map(x => [x.name, x.entries.map(e => [e.id, e.sets.length])])).toEqual([
+      ['GZCLP (test program) · A1', [['reppen:wger:111', 3]]]])
     act(() => { mounted.splice(0).forEach(r => r.unmount()) })
 
     host = await render(ReppenPrograms)

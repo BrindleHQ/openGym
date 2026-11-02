@@ -2618,4 +2618,5 @@ export default {
   'Your Reppen data is being deleted.': '正在刪除你的 Reppen 資料。',
   'Your program': '你的方案',
   'calculated': '計算值',
+  'Your Reppen program saved this workout. It cannot be changed here.': '這次訓練由你的 Reppen 計畫儲存，無法在這裡修改。',
 }

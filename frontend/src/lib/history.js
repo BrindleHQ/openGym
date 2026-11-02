@@ -336,7 +336,8 @@ export function unpairSuperset(items, idx) {
  * build time — editing the routine flag later never rewrites a saved session.
  */
 export function entryExcluded(w, entry) {
-  return w?.excludeFromProgression === true || entry?.noProg === true
+  // A workout another program ran (reppen/history.js) progresses there, never here.
+  return w?.excludeFromProgression === true || entry?.noProg === true || !!w?.managed
 }
 
 /**

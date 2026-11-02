@@ -2625,4 +2625,5 @@ export default {
   'Your Reppen data is being deleted.': 'Twoje dane w Reppen są usuwane.',
   'Your program': 'Twój program',
   'calculated': 'obliczone',
+  'Your Reppen program saved this workout. It cannot be changed here.': 'Ten trening zapisał Twój program Reppen. Nie można go tu zmienić.',
 }

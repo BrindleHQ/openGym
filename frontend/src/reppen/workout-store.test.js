@@ -23,8 +23,8 @@ function world() {
     return new Response(JSON.stringify(out), { status })
   })
   const client = reppenClient({ base: () => '/reppen/', token: async () => 't', fetch })
-  const device = () => {
-    const store = createReppenStore({ client, owner: () => 'u1', storage: memoryStorage(), today: () => '2026-11-01' })
+  const device = (opts = {}) => {
+    const store = createReppenStore({ client, owner: () => 'u1', storage: memoryStorage(), today: () => '2026-11-01', ...opts })
     store.getState().hydrate()
     return store
   }
@@ -68,6 +68,35 @@ describe('Reppen store: a workout', () => {
     expect(s.getState().local).toMatchObject({ workoutId: null, nextDay: 'B1' })
     await s.getState().loadHistory()
     expect(s.getState().history.map(h => h.workoutId)).toEqual([workout.workoutId])
+  })
+
+  it('tells OpenGym history of a finished workout: its own finish, and one found finished on resuming', async () => {
+    const w = world()
+    const recordFinished = vi.fn()
+    const phone = await enrolled(w, w.device({ recordFinished }))
+    await phone.getState().start('A1')
+    await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    // The laptop opened the same workout; the phone's finish answer is lost after Reppen applied it.
+    const laptopRecord = vi.fn()
+    const laptop = w.device({ recordFinished: laptopRecord })
+    laptop.setState({ local: { ...phone.getState().local } })
+    w.loseAnswer('POST', 'finish')
+    expect(await phone.getState().finish()).toBe(false)
+    expect(recordFinished).not.toHaveBeenCalled()
+    // A reload finds it finished: delivered then, with the completed record.
+    await phone.getState().resume()
+    expect(recordFinished).toHaveBeenCalledTimes(1)
+    expect(recordFinished.mock.calls[0][0]).toMatchObject({ workoutId: expect.any(String), status: 'completed', completed: { day: 'A1' } })
+    expect(recordFinished.mock.calls[0][1]).toMatchObject({ title: 'GZCLP (test program)' })
+    await laptop.getState().resume()
+    expect(laptopRecord).toHaveBeenCalledTimes(1)
+    // And a finish that is answered delivers the answer itself.
+    const other = vi.fn()
+    const s = await enrolled(w, w.device({ recordFinished: other }))
+    await s.getState().start('B1')
+    await s.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    expect(await s.getState().finish()).toBe(true)
+    expect(other).toHaveBeenCalledWith(s.getState().finished, expect.objectContaining({ title: 'GZCLP (test program)' }))
   })
 
   it('repeats a start whose answer was lost with the same workout id', async () => {
