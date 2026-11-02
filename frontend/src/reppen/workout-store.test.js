@@ -431,6 +431,36 @@ describe('Reppen store: two devices on one workout', () => {
     expect(laptop.getState().outbox).toEqual([])
   })
 
+  it('settles a draft when the set is logged or cleared again, so Save mine cannot overwrite it', async () => {
+    const { phone, laptop } = await twoDevices()
+    await phone.getState().logSet('squat', 'work', 0, { load: 100, reps: 5 })
+    await laptop.getState().logSet('squat', 'work', 0, { load: 105, reps: 5 })
+    expect(laptop.getState().rejected).toMatchObject([{ code: 'setTaken' }])
+    await laptop.getState().clearSet('squat', 'work', 0)
+    expect(laptop.getState().rejected).toEqual([])
+  })
+
+  it('records a refused event once when a catch-up moves it during the refetch', async () => {
+    const { w, phone, laptop } = await twoDevices()
+    await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    await laptop.getState().catchUp()
+    const realAppend = w.client.appendEvents
+    const realWorkout = w.client.workout
+    // Reppen refuses the one event; while recover() refetches, a catch-up finds the workout finished.
+    w.client.appendEvents = async (id, rev, events) => {
+      throw Object.assign(new Error('refused'), { code: 'invalidEvent', body: { eventId: events[0].id } })
+    }
+    w.client.workout = async id => {
+      w.client.workout = realWorkout
+      await phone.getState().finish()
+      await laptop.getState().catchUp()
+      return realWorkout(id)
+    }
+    await laptop.getState().logSet('bench', 'work', 1, { load: 50, reps: 10 })
+    w.client.appendEvents = realAppend
+    expect(laptop.getState().rejected.filter(r => r.event.set === 1)).toHaveLength(1)
+  })
+
   it('moves the other device to the finished state without finishing again', async () => {
     const { w, phone, laptop, recordFinished } = await twoDevices()
     await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })

@@ -145,7 +145,10 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       if (!get().workout || get().busy) return Promise.resolve()
       const id = newId()
       seenAt.set(id, get().workout.revision)
-      set({ outbox: [...get().outbox, { id, ...event }] })
+      // A new log or clear of a set settles any draft another device's save left there.
+      const rejected = isSetEvent(event)
+        ? get().rejected.filter(r => !(r.code === 'setTaken' && samePos(r.event, event))) : get().rejected
+      set({ outbox: [...get().outbox, { id, ...event }], rejected })
       return get().flush()
     }
     /* Takes what Reppen now holds for the workout. Events of ours among them were accepted (a lost
@@ -193,7 +196,9 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         if (!ev) return false
         const view = await client.workout(id).catch(() => null)
         if (!current()) return false
-        set({ outbox: get().outbox.filter(x => x.id !== bad), rejected: [...get().rejected, { event: ev, code: e.code }] })
+        // A catch-up during the refetch may already have moved it to the rejected entries.
+        if (get().outbox.some(x => x.id === bad))
+          set({ outbox: get().outbox.filter(x => x.id !== bad), rejected: [...get().rejected, { event: ev, code: e.code }] })
         if (view) adopt(view)
         return true
       }
