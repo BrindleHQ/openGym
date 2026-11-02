@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => {
 vi.mock('../store/useStore.js', () => {
   const useStore = selector => (selector ? selector(mocks.snapshot()) : mocks.snapshot())
   useStore.getState = mocks.snapshot
+  useStore.subscribe = vi.fn(() => () => {})
   return { useStore, DEF: { reminder: { time: '17:30' } }, hasData: () => false }
 })
 vi.mock('../store/useUI.js', () => {
