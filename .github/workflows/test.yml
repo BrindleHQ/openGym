@@ -150,7 +150,7 @@ jobs:
       - name: Unit and component tests
         working-directory: frontend
         run: >
-          npx vitest run
+          npx vitest run --maxWorkers=2
           --reporter=default --reporter=json --outputFile.json=test-results.json
           --reporter=junit --outputFile.junit=junit.xml
           --coverage --coverage.provider=v8 --coverage.include='src/**'
