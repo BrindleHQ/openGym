@@ -8,7 +8,7 @@ const json = (status, body) => new Response(body === undefined ? 'not json' : JS
 function setup(answers) {
   const calls = []
   const fetch = vi.fn(async (url, init) => {
-    calls.push({ url, method: init.method, auth: init.headers.Authorization, body: init.body ? JSON.parse(init.body) : undefined, credentials: init.credentials })
+    calls.push({ url, method: init.method, auth: init.headers.Authorization, body: init.body ? JSON.parse(init.body) : undefined, credentials: init.credentials, ifNoneMatch: init.headers['If-None-Match'], cache: init.cache })
     const next = answers.shift()
     if (next instanceof Error) throw next
     return next
@@ -46,6 +46,29 @@ describe('Reppen client', () => {
     await client.catalog('c/1')
     await client.history()
     expect(calls.map(c => c.url)).toEqual(['/gym/reppen/v1/program-catalog?limit=100&cursor=c%2F1', '/gym/reppen/v1/history?limit=50'])
+  })
+
+  it('revalidates the exercise catalog by its ETag, and passes a 304 back as such', async () => {
+    const doc = { format: 'reppen.exercise-catalog/1', entries: [] }
+    const { client, calls } = setup([
+      new Response(JSON.stringify(doc), { status: 200, headers: { ETag: '"abc"' } }),
+      new Response(null, { status: 304, headers: { ETag: '"abc"' } }),
+      json(401, { error: 'unauthenticated' }),
+      new Response(null, { status: 304 }),
+      json(500, undefined),
+    ])
+    expect(await client.exerciseCatalog()).toEqual({ catalog: doc, etag: '"abc"' })
+    expect(await client.exerciseCatalog('"abc"')).toEqual({ notModified: true })
+    // A refused token is replaced for this call too, with the same validator.
+    expect(await client.exerciseCatalog('"abc"')).toEqual({ notModified: true })
+    expect(calls.map(c => [c.url, c.ifNoneMatch, c.cache])).toEqual([
+      ['/gym/reppen/v1/exercise-catalog', undefined, 'no-store'],
+      ['/gym/reppen/v1/exercise-catalog', '"abc"', 'no-store'],
+      ['/gym/reppen/v1/exercise-catalog', '"abc"', 'no-store'],
+      ['/gym/reppen/v1/exercise-catalog', '"abc"', 'no-store'],
+    ])
+    expect(calls[3].auth).toMatch(/^Bearer fresh/)
+    await expect(client.exerciseCatalog('"abc"')).rejects.toMatchObject({ status: 500 })
   })
 
   it('replaces a refused token once, and takes a second refusal as the answer', async () => {

@@ -12,8 +12,9 @@ vi.mock('./client.js', async orig => {
     const path = url.replace(/^.*?\/reppen/, '')
     const body = init.body ? JSON.parse(init.body) : undefined
     wire.sent.push({ method: init.method, path, body })
-    const { status, body: out } = wire.fake.handle(init.method, path, body, 'u1')
-    return new Response(JSON.stringify(out), { status })
+    const headers = Object.fromEntries(new Headers(init.headers))
+    const { status, body: out, headers: answer } = wire.fake.handle(init.method, path, body, 'u1', headers)
+    return new Response(status === 304 ? null : JSON.stringify(out), { status, headers: answer })
   }
   return { ...m, reppenClient: () => m.reppenClient({ base: () => '/reppen/', token: async () => 't', fetch }) }
 })
@@ -99,6 +100,17 @@ describe('Reppen workout screens', () => {
     expect(host.querySelectorAll('.lrow').length).toBeGreaterThan(0)
     expect(host.textContent).toContain('Reppen history')
     expect(host.textContent).toContain('GZCLP (test program)')
+  })
+
+  it('names an exercise from the catalog when the plan gives it no label', async () => {
+    await reppenStore.getState().start('A1')
+    const host = await render(ReppenWorkout)
+    expect([...host.querySelectorAll('.rp-slot h2')].map(h => h.textContent)).toEqual(['Barbell Back Squat', 'Barbell Bench Press'])
+    const workout = structuredClone(reppenStore.getState().workout)
+    for (const slot of workout.effectivePlan.slots) delete slot.exercise.label
+    workout.effectivePlan.slots[1].exercise.id = 'wger:999'
+    await act(async () => reppenStore.setState({ workout }))
+    expect([...host.querySelectorAll('.rp-slot h2')].map(h => h.textContent)).toEqual(['Barbell Back Squat', 'wger:999'])
   })
 
   it('shows Resume for a workout in progress, and a refusal in words', async () => {
