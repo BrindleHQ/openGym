@@ -17,7 +17,7 @@
  * sent and kept with it, so a request repeated after a lost answer is the same request.
  */
 import { createStore } from 'zustand/vanilla'
-import { isRevisionConflict } from './client.js'
+import { isRevisionConflict, ReppenError } from './client.js'
 
 const KEY = owner => 'reppen.v1.' + owner
 const isSetEvent = e => e.kind === 'setLogged' || e.kind === 'setCleared'
@@ -486,6 +486,14 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
               // is still active, the person chooses, as when a start runs into it.
               if (e.code === 'activeWorkoutExists' && tries < 2) {
                 if (e.body.active) { set({ held: e.body }); return false }
+                // A held workout from an older enrollment can never finish. Do not give it
+                // the active place merely to discover that on the next finish request.
+                let baseRevision
+                try { baseRevision = JSON.parse(workout.document).baseEnrollmentRevision } catch { /* fail closed below */ }
+                if (!Number.isSafeInteger(baseRevision)) throw e
+                const enrollment = await client.enrollment(workout.enrollmentId)
+                if (enrollment.revision !== baseRevision)
+                  throw new ReppenError(409, { error: 'enrollmentConflict', expectedRevision: baseRevision, currentRevision: enrollment.revision })
                 adopt(await client.activate(workout.workoutId, null))
                 continue
               }

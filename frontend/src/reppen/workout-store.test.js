@@ -331,12 +331,12 @@ describe('Reppen store: a workout', () => {
     await laptop.getState().continueHeld()
     await laptop.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
     expect(await laptop.getState().finish()).toBe(true)
-    // Nothing is active, so the phone's takes the place back; then Reppen refuses it for good, and
-    // the store says so rather than looping.
+    // Nothing is active; the stale phone must leave the place free for the next valid start.
     expect(await phone.getState().finish()).toBe(false)
     expect(phone.getState().error).toMatchObject({ code: 'enrollmentConflict' })
     expect(w.sent.filter(r => r.path.startsWith(`/v1/workouts/${stale}/`) && !r.path.endsWith('/events')).map(r => r.path.split('/').at(-1)))
-      .toEqual(['finish', 'activate', 'finish'])
+      .toEqual(['finish'])
+    expect(await laptop.getState().start('A1')).toBe(true)
   })
 })
 
