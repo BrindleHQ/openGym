@@ -164,6 +164,7 @@ describe('Reppen workout screens', () => {
   })
 
   it('shows prescribed rest and RIR and retains issued units when the effective plan omits its stamp', async () => {
+    useStore.setState({ S: { ...useStore.getState().S, unit: 'lb' } })
     await reppenStore.getState().start('A1')
     const workout = structuredClone(reppenStore.getState().workout)
     workout.plan.stamp = { display: { load: 'lb' } }
@@ -179,6 +180,19 @@ describe('Reppen workout screens', () => {
     expect(set.textContent).toContain('2 RIR')
     expect(set.textContent).toContain('102.5 lb')
     expect(set.textContent).not.toContain('kg')
+  })
+
+  it('displays pounds but logs edited loads in the issued kilograms', async () => {
+    useStore.setState({ S: { ...useStore.getState().S, unit: 'lb' } })
+    await reppenStore.getState().start('A1')
+    const host = await render(ReppenWorkout)
+    const set = row(host, 'squat|work|0')
+    expect(set.textContent).toContain('225.97 lb')
+    await act(async () => type(set.querySelector('input[aria-label="lb"]'), '130'))
+    await click(set.querySelector('[role=checkbox]'))
+    const event = wire.sent.filter(r => r.path.endsWith('/events')).at(-1).body.events[0]
+    expect(event.values.load).toBeCloseTo(58.9670081, 8)
+    expect(set.querySelector('input[aria-label="lb"]').value).toBe('130')
   })
 
   it('runs a workout from start to history', async () => {
