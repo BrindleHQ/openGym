@@ -4,11 +4,20 @@
  *
  *   enrollment  the enrolled program: ids, title and the program's days
  *   nextDay     the day to train next (Reppen does not say yet; see suggestNextDay)
+ *   workoutId   the workout in progress, if any
+ *   pendingStart a start sent but not yet answered: { workoutId, body }
+ *
+ * A workout is changed only through event batches with ids made here. Events wait in `outbox`
+ * until Reppen has accepted them; `flush` sends them at the revision last seen and, when the
+ * workout moved on (another device, a lost answer), fetches it, drops what Reppen already holds
+ * and sends the rest. The outbox lives in memory for now; a stored command queue for offline
+ * use replaces it without changing the actions the screens call.
  *
  * Ids the client chooses (enrollment, workout, event) are UUIDs, made before the request is
  * sent and kept with it, so a request repeated after a lost answer is the same request.
  */
 import { createStore } from 'zustand/vanilla'
+import { isRevisionConflict } from './client.js'
 
 const KEY = owner => 'reppen.v1.' + owner
 
@@ -66,6 +75,35 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       try { storage.setItem(KEY(who), JSON.stringify(local)) } catch { /* private mode: kept for this page only */ }
       set({ local, localOwner: who })
     }
+    let again = false
+    function enqueue(event) {
+      if (!get().workout) return Promise.resolve()
+      set({ outbox: [...get().outbox, { id: newId(), ...event }] })
+      return get().flush()
+    }
+    // A refused batch: true when the outbox was put right and can be sent again.
+    async function recover(e) {
+      const id = get().workout.workoutId
+      if (isRevisionConflict(e)) {
+        // Fetch what Reppen holds; events of ours already among them were accepted (a lost answer).
+        const view = await client.workout(id).catch(() => null)
+        if (!view) return false
+        const held = new Set((view.events || []).map(ev => ev.id))
+        set({ workout: view, outbox: get().outbox.filter(ev => !held.has(ev.id)) })
+        return true
+      }
+      // One event Reppen will not take (a set another device logged first, a question no longer
+      // open): it leaves the outbox as a rejected draft, and the rest go again.
+      const bad = e.body?.eventId
+      if (bad && ['eventConflict', 'invalidEvent', 'unsupportedEvent'].includes(e.code)) {
+        const ev = get().outbox.find(x => x.id === bad)
+        if (!ev) return false
+        const view = await client.workout(id).catch(() => null)
+        set({ outbox: get().outbox.filter(x => x.id !== bad), rejected: [...get().rejected, { event: ev, code: e.code }], ...(view ? { workout: view } : {}) })
+        return true
+      }
+      return false
+    }
     return {
       local: {},
       localOwner: null,
@@ -73,12 +111,20 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       enrollmentView: null,   // GET /v1/enrollments/{id}
       error: null,            // the last failure, a ReppenError
       busy: false,
+      workout: null,          // the workout view, as Reppen last answered it
+      outbox: [],             // events not yet accepted, in order
+      rejected: [],           // events Reppen refused: shown so the person can log them again
+      held: null,             // an activeWorkoutExists answer to a start: { active, held }
+      finished: null,         // the finish answer of the workout just finished
+      flushing: false,
+      history: null,
 
       /** Loads this account's pointers; call on every screen mount (the account may have changed). */
       hydrate() {
         const who = owner()
         if (get().localOwner === who) return
-        set({ local: who ? readLocal(storage, who) : {}, localOwner: who, enrollmentView: null, error: null, busy: false })
+        set({ local: who ? readLocal(storage, who) : {}, localOwner: who, enrollmentView: null, error: null, busy: false,
+          workout: null, outbox: [], rejected: [], held: null, finished: null, history: null, flushing: false })
       },
 
       async loadCatalog() {
@@ -127,6 +173,127 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       },
 
       chooseDay(day) { save({ nextDay: day }) },
+
+      /** Starts the next workout on `day`, or repeats a start whose answer was lost. */
+      async start(day) {
+        const enrollment = get().local.enrollment
+        if (!enrollment || get().busy) return false
+        set({ busy: true, error: null, held: null, finished: null })
+        try {
+          const current = await client.enrollment(enrollment.enrollmentId)
+          const body = { enrollmentId: enrollment.enrollmentId, enrollmentRevision: current.revision, localDay: today(), day }
+          const prev = get().local.pendingStart
+          const same = prev && JSON.stringify(prev.body) === JSON.stringify(body)
+          const pending = same ? prev : { workoutId: newId(), body }
+          save({ pendingStart: pending })
+          try {
+            const view = await client.startWorkout(pending.workoutId, body)
+            save({ pendingStart: null, workoutId: view.workoutId })
+            set({ workout: view, outbox: [], rejected: [] })
+            return true
+          } catch (e) {
+            // Another workout holds the active place (another device, a lost pointer): this one is
+            // stored as held. The person chooses which to keep (continueActive / continueHeld).
+            if (e.code === 'activeWorkoutExists') { save({ pendingStart: null, workoutId: pending.workoutId }); set({ held: e.body }); return false }
+            throw e
+          }
+        } catch (e) { set({ error: e }); return false }
+        finally { set({ busy: false }) }
+      },
+
+      /** After a start found another active workout: carry on with that one. */
+      async continueActive() {
+        const active = get().held?.active?.workoutId
+        if (!active) return
+        save({ workoutId: active })
+        set({ held: null })
+        await get().resume()
+      },
+
+      /** After a start found another active workout: make the new one active in its place. */
+      async continueHeld() {
+        const { held } = get()
+        if (!held?.held?.workoutId) return
+        try {
+          const view = await client.activate(held.held.workoutId, held.active?.workoutId ?? null)
+          save({ workoutId: view.workoutId })
+          set({ held: null, workout: view, outbox: [], rejected: [], error: null })
+        } catch (e) { set({ error: e }) }
+      },
+
+      /** Fetches the workout in progress; forgets it once it is finished or gone. */
+      async resume() {
+        const id = get().local.workoutId
+        if (!id) return null
+        try {
+          const view = await client.workout(id)
+          if (view.status === 'completed') { save({ workoutId: null }); set({ workout: null }); return null }
+          set({ workout: view, error: null })
+          return view
+        } catch (e) {
+          if (e.code === 'workoutNotFound') { save({ workoutId: null }); set({ workout: null }) }
+          set({ error: e })
+          return null
+        }
+      },
+
+      logSet(slot, step, index, values) { return enqueue({ kind: 'setLogged', slot, step, set: index, values }) },
+      clearSet(slot, step, index) { return enqueue({ kind: 'setCleared', slot, step, set: index }) },
+      /** `question` is one of the workout's pendingQuestions; the occurrence goes back as Reppen sent it. */
+      answer(question, choice) { return enqueue({ kind: 'questionAnswered', question: question.id, occurrence: question.occurrence, value: choice.value }) },
+      dismissRejected() { set({ rejected: [] }) },
+
+      /** Sends the outbox. One run at a time; a call during a run makes the run go round again. */
+      async flush() {
+        if (get().flushing) { again = true; return }
+        set({ flushing: true })
+        try {
+          let tries = 0
+          do {
+            again = false
+            while (get().outbox.length && get().workout && tries < 5) {
+              tries++
+              const batch = get().outbox
+              const { workoutId, revision } = get().workout
+              try {
+                const view = await client.appendEvents(workoutId, revision, batch)
+                const sent = new Set(batch.map(e => e.id))
+                set({ workout: view, outbox: get().outbox.filter(e => !sent.has(e.id)), error: null })
+              } catch (e) {
+                if (!(await recover(e))) { set({ error: e }); return }
+              }
+            }
+          } while (again)
+        } finally { set({ flushing: false }) }
+      },
+
+      async finish() {
+        if (get().busy) return false
+        set({ busy: true, error: null })
+        try {
+          await get().flush()
+          const { workout, outbox } = get()
+          if (!workout || outbox.length) return false
+          for (let tries = 0; ; tries++) {
+            try {
+              const result = await client.finish(workout.workoutId, get().workout.revision)
+              const { enrollment } = get().local
+              save({ workoutId: null, nextDay: suggestNextDay(enrollment?.days, result.workout?.day ?? workout.day, enrollment?.defaultDay) })
+              set({ workout: null, finished: result })
+              return true
+            } catch (e) {
+              if (!isRevisionConflict(e) || tries >= 2) throw e
+              set({ workout: await client.workout(workout.workoutId) })
+            }
+          }
+        } catch (e) { set({ error: e }); return false }
+        finally { set({ busy: false }) }
+      },
+
+      async loadHistory() {
+        try { set({ history: (await client.history()).items || [], error: null }) }
+        catch (e) { set({ error: e }) }
+      },
     }
   })
   return store
