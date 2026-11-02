@@ -2626,4 +2626,7 @@ export default {
   'Your program': 'आपका प्रोग्राम',
   'calculated': 'गणना किया गया',
   'Your Reppen program saved this workout. It cannot be changed here.': 'आपके Reppen प्रोग्राम ने यह वर्कआउट सेव किया है। इसे यहाँ बदला नहीं जा सकता।',
+  'Another device saved this set first. Yours was: {0}': 'किसी दूसरे डिवाइस ने यह सेट पहले सेव किया। आपका था: {0}',
+  'Save mine': 'मेरा सेव करें',
+  'cleared': 'हटाया गया',
 }

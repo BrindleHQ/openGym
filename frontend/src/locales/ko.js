@@ -2626,4 +2626,7 @@ export default {
   'Your program': '내 프로그램',
   'calculated': '계산됨',
   'Your Reppen program saved this workout. It cannot be changed here.': 'Reppen 프로그램이 저장한 운동이에요. 여기서는 바꿀 수 없어요.',
+  'Another device saved this set first. Yours was: {0}': '다른 기기가 이 세트를 먼저 저장했어요. 내 기록: {0}',
+  'Save mine': '내 기록 저장',
+  'cleared': '지움',
 }

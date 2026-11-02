@@ -2673,4 +2673,7 @@ export default {
   'Your program': 'Ditt program',
   'calculated': 'beräknat',
   'Your Reppen program saved this workout. It cannot be changed here.': 'Ditt Reppen-program sparade det här passet. Det går inte att ändra här.',
+  'Another device saved this set first. Yours was: {0}': 'En annan enhet sparade det här setet först. Ditt var: {0}',
+  'Save mine': 'Spara mitt',
+  'cleared': 'rensat',
 }

@@ -2626,4 +2626,7 @@ export default {
   'Your program': 'Ton programme',
   'calculated': 'calculé',
   'Your Reppen program saved this workout. It cannot be changed here.': 'Ton programme Reppen a enregistré cette séance. Elle ne peut pas être modifiée ici.',
+  'Another device saved this set first. Yours was: {0}': 'Un autre appareil a enregistré cette série en premier. La tienne était : {0}',
+  'Save mine': 'Garder la mienne',
+  'cleared': 'effacée',
 }

@@ -2619,4 +2619,7 @@ export default {
   'Your program': '你的方案',
   'calculated': '計算值',
   'Your Reppen program saved this workout. It cannot be changed here.': '這次訓練由你的 Reppen 計畫儲存，無法在這裡修改。',
+  'Another device saved this set first. Yours was: {0}': '另一台裝置先儲存了這一組。你的是：{0}',
+  'Save mine': '儲存我的',
+  'cleared': '已清除',
 }
