@@ -32,7 +32,7 @@ import {
 } from './passkeys-store.js';
 import { createDeviceLink, findDeviceLink, burnDeviceLink, dropDeviceLinks, recoveryLinkOf, RECOVERY_TTL_MS } from './device-link.js';
 import { startAdminSocket } from './admin-socket.js';
-import { reppenConfig, openKeyStore, DEFAULT_LEAD_S, MAX_LEAD_S } from './reppen.js';
+import { reppenConfig, openKeyStore, erasureSender, DEFAULT_LEAD_S, MAX_LEAD_S } from './reppen.js';
 import { createMediaStore, mediaLimits, mediaConfig, MediaError, HASH_RE } from './media.js';
 import { effectiveRoutineId } from './queue.js';
 import { stampPut } from './sync-stamps.js';
@@ -156,6 +156,15 @@ db.creds = db.creds || [];
 db.subs = db.subs || [];
 db.invites = db.invites || [];
 db.deviceLinks = db.deviceLinks || [];   // unused one-time device links, hashed (device-link.js)
+// A deleted account is erased in Reppen too, when this instance knows where Reppen is (reppen.js).
+// The pending requests live in db.json, so they outlast a restart. Sending needs a token, so with
+// the token settings missing they are kept, and go out once a restart has them.
+const REPPEN_ERASURE_RETRY_MS = Math.max(50, +(process.env.REPPEN_ERASURE_RETRY_MS || 30000) || 30000);
+const reppenErasure = REPPEN.apiUrl
+  ? erasureSender({ db: () => db, save: () => saveDb(), mint: sub => reppenKeys.mint(sub, REPPEN), apiUrl: REPPEN.apiUrl, retryMs: REPPEN_ERASURE_RETRY_MS, active: REPPEN.enabled })
+  : null;
+if (REPPEN.apiUrl && !REPPEN.enabled) console.warn('REPPEN_API_URL is set but Reppen tokens are off (REPPEN_TOKEN_ISSUER, REPPEN_TOKEN_AUDIENCE): erasures of deleted accounts are kept and not sent until both are set');
+reppenErasure?.start();
 const isAdmin = user => !!user && (user.admin === true || ADMIN_UIDS.includes(user.id));
 // One owner per instance, any number of admins. Admins run the place day to day (users, invites,
 // the Coach); the owner is the one admin the others cannot act on: only the owner appoints or
@@ -1394,6 +1403,8 @@ function removeAccount(u) {
   try { coachConfig.clearProfileAuth(u.id); } catch { /* nothing stored */ }
   // Their photos and videos — the one place a profile's folder under uploads/ is removed.
   try { MEDIA.removeUser(u.id); } catch (e) { console.error('media: could not remove uploads of', u.id, e.message); }
+  // Their Reppen data: recorded here so it lands in the same save, sent in the background.
+  reppenErasure?.enqueue(u.id);
   saveDb();
 }
 
