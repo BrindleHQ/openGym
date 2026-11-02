@@ -49,6 +49,12 @@ export const unaskedParameters = entry => (entry?.parameters || []).filter(p => 
 export const emptyParams = entry => Object.fromEntries((entry?.parameters || []).filter(p => p?.type?.t === 'opt')
   .map(p => [p.name, { v: 'none', cause: { k: 'declaredNone' } }]))
 
+// A workout Reppen stored but holds back because another one is active: the same choice a start
+// that ran into it offers (activeWorkoutExists), read from the workout itself, so it survives a reload.
+const heldBy = view => (view && view.active === false && view.activeWorkout
+  ? { active: view.activeWorkout, held: { workoutId: view.workoutId, day: view.day, eventCount: view.eventCount } }
+  : null)
+
 function readLocal(storage, owner) {
   try { return JSON.parse(storage.getItem(KEY(owner))) || {} } catch { return {} }
 }
@@ -236,6 +242,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
               return false
             }
             adoptWorkout(view)
+            set({ held: heldBy(view) })
             return true
           } catch (e) {
             // Another workout holds the active place (another device, a lost pointer): this one is
@@ -277,7 +284,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
           if (get().local.workoutId !== id) return null
           if (view.status === 'completed') { completedWorkout(id, null, view.events); return null }
           adoptWorkout(view)
-          set({ error: null })
+          set({ held: heldBy(view) })
           return view
         } catch (e) {
           if (e.code === 'workoutNotFound') { save({ workoutId: null }); set({ workout: null }) }
@@ -352,7 +359,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       },
 
       async loadHistory() {
-        try { set({ history: (await client.history()).items || [], error: null }) }
+        try { set({ history: (await client.history()).items || [] }) }
         catch (e) { set({ error: e }) }
       },
     }
