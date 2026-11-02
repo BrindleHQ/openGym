@@ -12,6 +12,7 @@ import { loggedSets, metricOrder, posKey, startValue, targetText } from './plan.
 import { errorText } from './messages.js'
 import { exerciseName } from './store.js'
 import { Held } from './ReppenPrograms.jsx'
+import OfflineStatus from './OfflineStatus.jsx'
 import './reppen.css'
 
 const actions = () => reppenStore.getState()
@@ -88,8 +89,8 @@ function Question({ q }) {
 
 function Finished({ result, nextDay, nav }) {
   return <div className="card rp-finished">
-    <h2><Icon name="check" /> {t('Workout saved')}</h2>
-    <p>{t('Day {0} is in your Reppen history.', result.completed?.day ?? result.workout?.day)}</p>
+    <h2><Icon name="check" /> {t(result.offline ? 'Workout saved on this device' : 'Workout saved')}</h2>
+    <p>{result.offline ? t('It will enter your history after Reppen verifies it on sync.') : t('Day {0} is in your Reppen history.', result.completed?.day ?? result.workout?.day)}</p>
     {nextDay && <p>{t('Next workout: {0}', nextDay)}</p>}
     <Button variant="filled" onClick={() => nav('/reppen')}>{t('Done')}</Button>
   </div>
@@ -119,6 +120,13 @@ export default function ReppenWorkout() {
     st.resume().finally(() => setLoaded(true))
   }, [ok, user?.id])
 
+  // C3 packs are tied to the server revision. An older response cannot replace
+  // a newer one (the store checks the complete identity before retaining it).
+  useEffect(() => {
+    if (!ok || !workout) return
+    actions().loadOfflinePack().catch(() => {})
+  }, [ok, workout?.workoutId, workout?.revision])
+
   // Another device may log on this workout or finish it: catch up when the runner comes back into
   // view or online, and every CATCH_UP_MS while it is shown.
   const open = workout?.workoutId
@@ -131,7 +139,7 @@ export default function ReppenWorkout() {
     return () => { clearInterval(timer); for (const [target, name] of on) target.removeEventListener(name, catchUp) }
   }, [ok, open])
 
-  if (!config) return null
+  if (!config && !ok) return null
   if (!ok) return <Navigate to="/plan" replace />
   const head = (title, sub) => <div className="hdr">
     <button className="iconbtn" data-back="/reppen" onClick={() => nav('/reppen')} aria-label={t('Programs')}><Icon name="chevronLeft" /></button>
@@ -144,7 +152,7 @@ export default function ReppenWorkout() {
     <Button size="sm" onClick={() => actions().dismissRejected()}>{t('OK')}</Button>
   </div>
   if (!workout) {
-    if (finished) return <div className="narrow reppen">{head(t('Workout'))}{othersNote}<Finished result={finished} nextDay={local.nextDay} nav={nav} /></div>
+    if (finished) return <div className="narrow reppen">{head(t('Workout'))}{othersNote}<OfflineStatus /><Finished result={finished} nextDay={local.nextDay} nav={nav} /></div>
     if (!loaded) return <div className="narrow reppen">{head(t('Workout'))}</div>
     if (!error) return <Navigate to="/reppen" replace />
   }
@@ -154,18 +162,21 @@ export default function ReppenWorkout() {
   const drafts = new Map(rejected.filter(r => r.code === 'setTaken').map(r => [posKey(r.event.slot, r.event.step, r.event.set), r]))
   const unit = plan?.stamp?.display?.load
   const questions = workout?.pendingQuestions || []
+  const canFinishOffline = workout && actions().previewOfflineFinish().finish.k === 'finished'
   return <div className="narrow reppen">
     {head(workout ? t('Day {0}', workout.day) : t('Workout'), local.enrollment?.title)}
     {(error || outbox.length > 0) && <div className="card reppen-error" role="alert">{errorText(error)}
       {workout && <Button size="sm" onClick={() => actions().flush()}>{t('Try again')}</Button>}</div>}
     {othersNote}
+    <OfflineStatus />
     {held && <Held held={held} nav={nav} />}
     {questions.map(q => <Question key={q.occurrence} q={q} />)}
     {(plan?.slots || []).map(slot => <SlotCard key={workout.workoutId + ':' + slot.slot} slot={slot} logged={logged} drafts={drafts} unit={unit} disabled={busy} />)}
     {workout && <div className="rp-finish">
-      <Button variant="filled" disabled={busy || questions.length > 0 || outbox.length > 0}
+      <Button variant="filled" disabled={busy || questions.length > 0 || (outbox.length > 0 && !canFinishOffline)}
         onClick={async () => { await actions().finish() }}>{t('Finish workout')}</Button>
       {questions.length > 0 && <p className="sect-f">{t('Answer the open questions before finishing.')}</p>}
+      {outbox.length > 0 && !canFinishOffline && <p className="sect-f">{t('Connect to finish this workout. Your entries are saved on this device.')}</p>}
     </div>}
   </div>
 }

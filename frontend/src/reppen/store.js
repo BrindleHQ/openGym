@@ -17,7 +17,13 @@
  * sent and kept with it, so a request repeated after a lost answer is the same request.
  */
 import { createStore } from 'zustand/vanilla'
+<<<<<<< HEAD
 import { isRevisionConflict, ReppenError } from './client.js'
+=======
+import { isRevisionConflict } from './client.js'
+import { previewOfflineFinish } from './offline-finish.js'
+import { withOfflineQueue } from './offline-queue.js'
+>>>>>>> 3f573112 (Keep Reppen workouts durable through offline finish and reconnect)
 
 const KEY = owner => 'reppen.v1.' + owner
 const isSetEvent = e => e.kind === 'setLogged' || e.kind === 'setCleared'
@@ -206,6 +212,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
     }
     return {
       local: {},
+      _rememberPending(events, revision) { for (const e of events) if (!seenAt.has(e.id)) seenAt.set(e.id, revision) },
       localOwner: null,
       catalog: null,          // catalog entries, once loaded
       enrollmentView: null,   // GET /v1/enrollments/{id}
@@ -214,6 +221,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       enrollmentError: null,
       busy: false,
       workout: null,          // the workout view, as Reppen last answered it
+      offlinePack: null,      // C3 data, bound to an exact workout revision
       outbox: [],             // events not yet accepted, in order
       rejected: [],           // events Reppen refused: shown so the person can log them again
       held: null,             // an activeWorkoutExists answer to a start: { active, held }
@@ -230,7 +238,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         flushRun = null
         catching = null   // the last account's catch-up never settles (the client above)
         set({ local: who ? readLocal(storage, who) : {}, localOwner: who, enrollmentView: null, error: null, catalogError: null, enrollmentError: null, busy: false,
-          workout: null, outbox: [], rejected: [], held: null, finished: null, history: null, flushing: false })
+          workout: null, offlinePack: null, outbox: [], rejected: [], held: null, finished: null, history: null, flushing: false })
       },
 
       async loadCatalog() {
@@ -394,6 +402,17 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         }
       },
 
+      async loadOfflinePack() {
+        const current = get().workout
+        if (!current) return null
+        const pack = await client.offlinePack(current.workoutId)
+        const now = get().workout
+        if (now?.workoutId !== pack.workoutId || now.revision < pack.workoutRevision || now.artifactId !== pack.artifactId || now.enrollmentId !== pack.enrollmentId) return null
+        set({ offlinePack: pack })
+        return pack
+      },
+      previewOfflineFinish() { return previewOfflineFinish(get().offlinePack, get().workout, get().outbox) },
+
       logSet(slot, step, index, values) { return enqueue({ kind: 'setLogged', slot, step, set: index, values }) },
       clearSet(slot, step, index) { return enqueue({ kind: 'setCleared', slot, step, set: index }) },
       /** `question` is one of the workout's pendingQuestions; the occurrence goes back as Reppen sent it. */
@@ -443,7 +462,8 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
               const batch = get().outbox
               const { revision } = get().workout
               try {
-                const view = await client.appendEvents(id, revision, batch)
+                const claims = (get().offlineComputed || []).filter(c => batch.some(e => e.id === c.eventId))
+                const view = await client.appendEvents(id, revision, batch, ...(claims.length ? [claims] : []))
                 if (!current()) return
                 adopt(view)
                 set({ error: null })
@@ -474,7 +494,8 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
           if (!workout || outbox.length) return false
           for (let tries = 0; ; tries++) {
             try {
-              const result = await client.finish(workout.workoutId, get().workout.revision)
+              const preview = get().previewOfflineFinish()
+              const result = await client.finish(workout.workoutId, get().workout.revision, preview.offlineState)
               const { enrollment } = get().local
               save({ workoutId: null, nextDay: suggestNextDay(enrollment?.days, result.workout?.day ?? workout.day, enrollment?.defaultDay) })
               set({ workout: null, finished: result })
@@ -514,5 +535,5 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       },
     }
   })
-  return store
+  return withOfflineQueue(store, { client, owner, storage, today, newId, recordFinished })
 }

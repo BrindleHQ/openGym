@@ -19,11 +19,22 @@ function setup(answers) {
 }
 
 describe('Reppen client', () => {
-  it('classifies token-mint connection failures as offline without hiding authentication refusal', async () => {
+  it('allows only the cached account to reopen its runner without server config', () => {
+    const kept = { version: 1, owner: 'one', data: { local: { enrollment: { enrollmentId: 'e' } } } }
+    const storage = { getItem: () => JSON.stringify(kept) }
+    expect(reppenAvailable(null, { id: 'one' }, { storage })).toBe(true)
+    expect(reppenAvailable(null, { id: 'two' }, { storage })).toBe(false)
+    expect(reppenAvailable({ reppen: false }, { id: 'one' }, { storage })).toBe(false)
+    expect(reppenAvailable(null, null, { storage })).toBe(false)
+    expect(reppenAvailable(null, { id: 'one' }, { storage, mobile: true })).toBe(false)
+  })
+  it('keeps commands offline when a cold launch cannot mint a token', async () => {
     const client = reppenClient({ base: () => '/reppen/', token: async () => { throw new TypeError('Failed to fetch') } })
     await expect(client.history()).rejects.toMatchObject({ status: 0, code: 'offline' })
     const refused = reppenClient({ base: () => '/reppen/', token: async () => { throw Object.assign(new Error('signed out'), { status: 401 }) } })
     await expect(refused.history()).rejects.toMatchObject({ status: 401 })
+    const gateway = reppenClient({ base: () => '/reppen/', token: async () => { throw Object.assign(new Error('gateway unavailable'), { status: 502 }) } })
+    await expect(gateway.history()).rejects.toMatchObject({ status: 0, code: 'offline' })
   })
   it.each([['GET', 20000], ['POST', 60000]])('keeps the %s deadline active while the response body is stalled', async (method, timeout) => {
     vi.useFakeTimers()
@@ -45,6 +56,11 @@ describe('Reppen client', () => {
       await pending
       expect(isOffline(result)).toBe(true)
     } finally { vi.useRealTimers() }
+  })
+  it('keeps commands retryable when the gateway cannot reach Reppen', async () => {
+    const { client } = setup([json(502), json(503), json(504), json(503, { error: 'maintenance' })])
+    for (let i = 0; i < 3; i++) await expect(client.history()).rejects.toMatchObject({ code: 'offline', status: 0 })
+    await expect(client.history()).rejects.toMatchObject({ code: 'maintenance', status: 503 })
   })
   it('sends a Bearer and no cookies, on the same origin under /reppen/v1', async () => {
     const { client, calls } = setup([json(200, { workoutId: 'w 1', revision: 0 })])

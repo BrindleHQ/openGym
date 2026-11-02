@@ -165,7 +165,8 @@ describe('Reppen workout screens', () => {
     // A tick undone is a clear, not a deletion of a list entry.
     await click(row(host, 'bench|work|0').querySelector('[role=checkbox]'))
     await click(row(host, 'bench|work|0').querySelector('[role=checkbox]'))
-    expect(wire.sent.at(-1).body.events[0]).toMatchObject({ kind: 'setCleared', slot: 'bench', step: 'work', set: 0 })
+    expect(wire.sent.findLast(r => r.path.endsWith('/events')).body.events[0]).toMatchObject({ kind: 'setCleared', slot: 'bench', step: 'work', set: 0 })
+    expect(wire.sent.some(r => r.method === 'GET' && r.path.endsWith('/offline-pack'))).toBe(true)
 
     await click(button(host, 'Finish workout'))
     expect(wire.sent.at(-1)).toMatchObject({ method: 'POST', body: { expectedRevision: 6 } })
@@ -270,7 +271,7 @@ describe('Reppen workout screens', () => {
     // The row shows the value Reppen kept, not the one typed here.
     expect(row(host, 'squat|work|0').querySelector('input').value).toBe('110')
     await click(button(draft, 'Save mine'))
-    expect(wire.sent.at(-1).body.events[0]).toMatchObject({ kind: 'setLogged', set: 0, values: { load: 100 } })
+    expect(wire.sent.findLast(r => r.path.endsWith('/events')).body.events[0]).toMatchObject({ kind: 'setLogged', set: 0, values: { load: 100 } })
     expect(row(host, 'squat|work|0').querySelector('.rp-draft')).toBe(null)
 
     // Hidden, the runner does not ask; shown again, it catches up and finds the workout finished.

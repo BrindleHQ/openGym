@@ -9,6 +9,7 @@ import { Button, NumberField, Row, Section, Segmented, SelectRow } from '../comp
 import { reppenAvailable, reppenStore, useReppen } from './connection.js'
 import { exerciseName, massReadings, unaskedParameters } from './store.js'
 import { errorText } from './messages.js'
+import OfflineStatus from './OfflineStatus.jsx'
 import { fmtDate } from '../lib/format.js'
 import './reppen.css'
 
@@ -121,7 +122,7 @@ export default function ReppenPrograms() {
     actions().resume()
   }, [ok, user?.id])
 
-  if (!config) return null
+  if (!config && !ok) return null
   if (!ok) return <Navigate to="/plan" replace />
   const enrollment = local.enrollment
   const nextDay = local.nextDay ?? enrollment?.defaultDay ?? null
@@ -132,6 +133,7 @@ export default function ReppenPrograms() {
       <div style={{ flex: 1, marginInlineStart: 12 }}><h1>{t('Programs')}</h1><div className="sub">Reppen</div></div>
     </div>
     {[error, catalogError, enrollmentError].filter(Boolean).map((e, i) => <div key={i} className="card reppen-error" role="alert">{errorText(e)}</div>)}
+    <OfflineStatus />
     {held && <Held held={held} nav={nav} />}
     {enrollment && <NextWorkout enrollment={enrollment} nextDay={nextDay} workoutId={local.workoutId} nav={nav} />}
     {picking
