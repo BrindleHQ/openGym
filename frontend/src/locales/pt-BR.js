@@ -1670,6 +1670,28 @@ export const PT_BR_OVERRIDES = {
   'App icon': 'Ícone do app',
   'Just for this phone. Some home screens take a moment to catch up.': 'Só para este celular. Algumas telas iniciais demoram um pouco para perceber.',
   'Try the Halloween app icon': 'Experimente o ícone de Halloween do app',
+  // --- Reppen programs and workouts ---
+  'Another workout is already in progress: {0}, {1} entries logged.': 'Já tem outro treino em andamento: {0}, {1} registros.',
+  'Answer the open questions before finishing.': 'Responda às perguntas em aberto antes de terminar.',
+  'Day {0} is in your Reppen history.': 'O dia {0} está no seu histórico do Reppen.',
+  'Enter your current numbers. The program sets your first weights from them.': 'Informe seus valores atuais. O programa define as primeiras cargas a partir deles.',
+  'Log at least one set before finishing.': 'Registre pelo menos uma série antes de terminar.',
+  'Logged by hand': 'Registrado à mão',
+  'Reppen calculated these targets from the sets you logged.': 'O Reppen calculou estes objetivos a partir das séries registradas.',
+  'Reppen could not be reached. Check your connection and try again.': 'Não foi possível conectar ao Reppen. Verifique sua conexão e tente de novo.',
+  'Reppen did not accept your sign-in. Sign in again and retry.': 'O Reppen não aceitou seu login. Entre de novo e tente outra vez.',
+  'Reppen did not take {0} of your entries. Log them again if they are still right.': 'O Reppen não aceitou {0} dos seus registros. Registre de novo se ainda estiverem certos.',
+  'Reppen no longer has this program enrollment.': 'O Reppen não tem mais esta inscrição no programa.',
+  'Reppen no longer has this workout.': 'O Reppen não tem mais este treino.',
+  'Something went wrong with Reppen. Try again.': 'Algo deu errado com o Reppen. Tente de novo.',
+  'This program cannot run here yet.': 'Este programa ainda não pode rodar aqui.',
+  'This program needs readings this app cannot collect yet.': 'Este programa precisa de medições que este app ainda não consegue coletar.',
+  'This program needs settings this app cannot collect yet.': 'Este programa precisa de configurações que este app ainda não consegue coletar.',
+  'This program is no longer available.': 'Este programa não está mais disponível.',
+  'This replaces {0} in this app.': 'Isso substitui {0} neste app.',
+  'Workout saved': 'Treino salvo',
+  'Your Reppen data is being deleted.': 'Seus dados do Reppen estão sendo apagados.',
+  'Your program': 'Seu programa',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }
