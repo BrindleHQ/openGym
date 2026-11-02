@@ -163,6 +163,24 @@ describe('Reppen workout screens', () => {
     expect(host.querySelector('.rp-finished')).toBeTruthy()
   })
 
+  it('shows prescribed rest and RIR and retains issued units when the effective plan omits its stamp', async () => {
+    await reppenStore.getState().start('A1')
+    const workout = structuredClone(reppenStore.getState().workout)
+    workout.plan.stamp = { display: { load: 'lb' } }
+    const effective = structuredClone(workout.effectivePlan || workout.plan)
+    delete effective.stamp
+    effective.slots[0].steps[0].sets[0].restSec = 120
+    effective.slots[0].steps[0].sets[0].metrics.effort = { k: 'fixed', v: { b: 'exact', v: 2 } }
+    workout.effectivePlan = effective
+    reppenStore.setState({ workout })
+    const host = await render(ReppenWorkout)
+    const set = row(host, 'squat|work|0')
+    expect(set.textContent).toContain('Rest (s): 120')
+    expect(set.textContent).toContain('2 RIR')
+    expect(set.textContent).toContain('102.5 lb')
+    expect(set.textContent).not.toContain('kg')
+  })
+
   it('runs a workout from start to history', async () => {
     let host = await render(ReppenPrograms)
     await click(button(host, 'Start A1'))

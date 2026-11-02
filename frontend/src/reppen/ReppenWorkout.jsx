@@ -17,7 +17,7 @@ import './reppen.css'
 
 const actions = () => reppenStore.getState()
 
-const metricLabel = (m, unit) => (m === 'load' ? (unit || 'kg') : m === 'reps' ? t('Reps') : m)
+const metricLabel = (m, unit) => (m === 'load' ? (unit || 'kg') : m === 'reps' ? t('Reps') : m === 'effort' ? t('RIR') : m)
 const roleLabel = role => (role === 'amrap' ? t('AMRAP') : role === 'working' ? null : role)
 // How often the open runner catches up with other devices while it is shown.
 export const CATCH_UP_MS = 20000
@@ -56,6 +56,7 @@ function SetRow({ slot, step, set, index, number, logged, taken, unit, disabled 
       <span className="rp-t">{targetText(set.metrics[m]) ?? t('calculated')} {metricLabel(m, unit)}</span>
     </label>)}
     <Check checked={done} disabled={disabled} label={t('Set {0} done', number)} onChange={toggle} />
+    {Number.isFinite(set.restSec) && <small className="rp-rest">{t('Rest (s)')}: {set.restSec}</small>}
     {taken && <Draft draft={taken} metrics={metrics} unit={unit} />}
   </div>
 }
@@ -169,7 +170,7 @@ export default function ReppenWorkout() {
   const plan = workout?.effectivePlan || workout?.plan
   const logged = loggedSets(workout, outbox)
   const drafts = new Map(rejected.filter(r => r.code === 'setTaken').map(r => [posKey(r.event.slot, r.event.step, r.event.set), r]))
-  const unit = plan?.stamp?.display?.load
+  const unit = plan?.stamp?.display?.load || workout?.plan?.stamp?.display?.load
   const questions = workout?.pendingQuestions || []
   const canFinishOffline = workout && actions().previewOfflineFinish().finish.k === 'finished'
   return <div className="narrow reppen">
