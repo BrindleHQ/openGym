@@ -18,7 +18,7 @@ const actions = () => reppenStore.getState()
 const metricLabel = (m, unit) => (m === 'load' ? (unit || 'kg') : m === 'reps' ? t('Reps') : m)
 const roleLabel = role => (role === 'amrap' ? t('AMRAP') : role === 'working' ? null : role)
 
-function SetRow({ slot, step, set, index, number, logged, unit }) {
+function SetRow({ slot, step, set, index, number, logged, unit, disabled }) {
   const metrics = metricOrder(set.metrics)
   const [draft, setDraft] = useState({})
   const value = m => (m in draft ? draft[m] : startValue(set.metrics[m], logged?.values?.[m]))
@@ -33,15 +33,15 @@ function SetRow({ slot, step, set, index, number, logged, unit }) {
   return <div className={'rp-set' + (done ? ' done' : '') + (logged?.pending ? ' pending' : '')} data-pos={posKey(slot, step.key, index)}>
     <span className="rp-n">{number}{role && <small>{role}</small>}</span>
     {metrics.map(m => <label key={m} className="rp-m">
-      <NumberField value={value(m)} nullable disabled={done} aria-label={metricLabel(m, unit)}
+      <NumberField value={value(m)} nullable disabled={done || disabled} aria-label={metricLabel(m, unit)}
         onChange={v => setDraft(d => ({ ...d, [m]: v }))} />
       <span className="rp-t">{targetText(set.metrics[m]) ?? t('calculated')} {metricLabel(m, unit)}</span>
     </label>)}
-    <Check checked={done} label={t('Set {0} done', number)} onChange={toggle} />
+    <Check checked={done} disabled={disabled} label={t('Set {0} done', number)} onChange={toggle} />
   </div>
 }
 
-function SlotCard({ slot, logged, unit }) {
+function SlotCard({ slot, logged, unit, disabled }) {
   // Sets are numbered through the exercise, as on the app's own workout screen; each still logs
   // under its own step key and index.
   let number = 0
@@ -50,16 +50,17 @@ function SlotCard({ slot, logged, unit }) {
     {slot.steps.map(step => <div key={step.key} className="rp-step" data-step={step.key}>
       {step.live && <p className="sect-f">{t('Reppen calculated these targets from the sets you logged.')}</p>}
       {step.sets.map((set, i) => <SetRow key={i} slot={slot.slot} step={step} set={set} index={i} number={++number}
-        logged={logged.get(posKey(slot.slot, step.key, i))} unit={unit} />)}
+        logged={logged.get(posKey(slot.slot, step.key, i))} unit={unit} disabled={disabled} />)}
     </div>)}
   </div>
 }
 
 function Question({ q }) {
+  const disabled = useReppen(s => s.busy || s.outbox.some(e => e.kind === 'questionAnswered' && e.question === q.id && e.occurrence === q.occurrence))
   return <div className="card rp-question" data-question={q.id}>
     <h2>{q.text}</h2>
     <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-      {q.choices.map((c, i) => <Button key={i} variant="tinted" onClick={() => actions().answer(q, c)}>{c.label}</Button>)}
+      {q.choices.map((c, i) => <Button key={i} disabled={disabled} variant="tinted" onClick={() => actions().answer(q, c)}>{c.label}</Button>)}
     </div>
   </div>
 }
@@ -114,7 +115,7 @@ export default function ReppenWorkout() {
   const questions = workout?.pendingQuestions || []
   return <div className="narrow reppen">
     {head(workout ? t('Day {0}', workout.day) : t('Workout'), local.enrollment?.title)}
-    {error && <div className="card reppen-error" role="alert">{errorText(error)}
+    {(error || outbox.length > 0) && <div className="card reppen-error" role="alert">{errorText(error)}
       {workout && <Button size="sm" onClick={() => actions().flush()}>{t('Try again')}</Button>}</div>}
     {rejected.length > 0 && <div className="card reppen-error" role="alert">
       {t('Reppen did not take {0} of your entries. Log them again if they are still right.', rejected.length)}
@@ -122,7 +123,7 @@ export default function ReppenWorkout() {
     </div>}
     {held && <Held held={held} nav={nav} />}
     {questions.map(q => <Question key={q.occurrence} q={q} />)}
-    {(plan?.slots || []).map(slot => <SlotCard key={slot.slot} slot={slot} logged={logged} unit={unit} />)}
+    {(plan?.slots || []).map(slot => <SlotCard key={workout.workoutId + ':' + slot.slot} slot={slot} logged={logged} unit={unit} disabled={busy} />)}
     {workout && <div className="rp-finish">
       <Button variant="filled" disabled={busy || questions.length > 0 || outbox.length > 0}
         onClick={async () => { await actions().finish() }}>{t('Finish workout')}</Button>

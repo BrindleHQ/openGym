@@ -71,7 +71,7 @@ function NextWorkout({ enrollment, nextDay, workoutId, nav }) {
 
 // A start found another workout active (another device, or one this browser lost track of).
 export function Held({ held, nav }) {
-  const go = async fn => { await fn(); if (reppenStore.getState().workout) nav('/reppen/workout') }
+  const go = async fn => { if (await fn()) nav('/reppen/workout') }
   return <div className="card rp-held" role="alert">
     <p>{t('Another workout is already in progress: {0}, {1} entries logged.', held.active?.day ?? '?', held.active?.eventCount ?? 0)}</p>
     <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>

@@ -5,14 +5,16 @@ import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const wire = vi.hoisted(() => ({ fake: null, sent: [] }))
+const wire = vi.hoisted(() => ({ fake: null, sent: [], offlineEvents: false, offlineActivate: false, after: null }))
 vi.mock('./client.js', async orig => {
   const m = await orig()
   const fetch = async (url, init) => {
     const path = url.replace(/^.*?\/reppen/, '')
     const body = init.body ? JSON.parse(init.body) : undefined
     wire.sent.push({ method: init.method, path, body })
+    if ((wire.offlineEvents && path.endsWith('/events')) || (wire.offlineActivate && path.endsWith('/activate'))) throw new TypeError('Failed to fetch')
     const { status, body: out } = wire.fake.handle(init.method, path, body, 'u1')
+    await wire.after?.(path, body)
     return new Response(JSON.stringify(out), { status })
   }
   return { ...m, reppenClient: () => m.reppenClient({ base: () => '/reppen/', token: async () => 't', fetch }) }
@@ -41,14 +43,20 @@ const settle = () => act(async () => { for (let i = 0; i < 5; i++) await new Pro
 const button = (host, text) => [...host.querySelectorAll('button')].find(b => b.textContent.trim() === text)
 const click = async el => { await act(async () => el.click()); await settle() }
 const row = (host, pos) => host.querySelector(`[data-pos="${pos}"]`)
+const initialProfile = structuredClone(useStore.getState().S)
+const type = (input, value) => {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value)
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+}
 
 beforeEach(async () => {
   wire.fake = createFakeReppen()
   wire.sent = []
+  wire.offlineEvents = false; wire.offlineActivate = false; wire.after = null
   navSpy.mockClear()
   localStorage.clear()
   reppenStore.setState({ local: {}, localOwner: null, catalog: null, enrollmentView: null, error: null, busy: false, workout: null, outbox: [], rejected: [], held: null, finished: null, history: null })
-  useStore.setState({ config: { reppen: true }, user: { id: 'u1', name: 'Ana' } })
+  useStore.setState({ S: structuredClone(initialProfile), config: { reppen: true }, user: { id: 'u1', name: 'Ana' } })
   reppenStore.getState().hydrate()
   await reppenStore.getState().loadCatalog()
   await reppenStore.getState().enroll(reppenStore.getState().catalog[0], { 0: 140, 1: 100 })
@@ -56,6 +64,75 @@ beforeEach(async () => {
 afterEach(() => { act(() => { mounted.splice(0).forEach(r => r.unmount()) }); document.body.innerHTML = '' })
 
 describe('Reppen workout screens', () => {
+  it('resets typed set drafts when continuing another workout', async () => {
+    await reppenStore.getState().start('A1')
+    await reppenStore.getState().start('B1')
+    await reppenStore.getState().resume()
+    const host = await render(ReppenWorkout)
+    await act(async () => type(row(host, 'squat|work|0').querySelector('input'), '999'))
+    await click(button(host, 'Continue that workout'))
+    expect(host.querySelector('h1').textContent).toBe('Day A1')
+    expect(row(host, 'squat|work|0').querySelector('input').value).toBe('102.5')
+  })
+
+  it('keeps a failed activation on Programs visible without navigating', async () => {
+    await reppenStore.getState().start('A1')
+    await reppenStore.getState().start('B1')
+    const host = await render(ReppenPrograms)
+    navSpy.mockClear(); wire.offlineActivate = true
+    await click(button(host, 'Start this one instead'))
+    expect(navSpy).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('could not be reached')
+  })
+
+  it('queues only one answer when a question is tapped twice before its response', async () => {
+    await reppenStore.getState().start('A1')
+    const host = await render(ReppenWorkout)
+    for (let i = 0; i < 3; i++) await click(row(host, `squat|work|${i}`).querySelector('[role=checkbox]'))
+    let release
+    wire.after = (path, body) => path.endsWith('/events') && body.events.some(e => e.kind === 'questionAnswered') ? new Promise(r => { release = r }) : undefined
+    const yes = button(host, 'Yes')
+    await act(async () => { yes.click(); yes.click() })
+    await settle()
+    expect(reppenStore.getState().outbox).toHaveLength(1)
+    await act(async () => release())
+    await settle()
+    expect(reppenStore.getState().rejected).toEqual([])
+  })
+
+  it('offers retry for queued entries even when navigation cleared the error', async () => {
+    await reppenStore.getState().start('A1')
+    wire.offlineEvents = true
+    await reppenStore.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    reppenStore.setState({ error: null })
+    const host = await render(ReppenWorkout)
+    const retry = button(host, 'Try again')
+    expect(retry).toBeTruthy()
+    wire.offlineEvents = false
+    await click(retry)
+    expect(reppenStore.getState().outbox).toEqual([])
+  })
+
+  it('blocks set changes while Finish is waiting for its response', async () => {
+    await reppenStore.getState().start('A1')
+    await reppenStore.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    const host = await render(ReppenWorkout)
+    let release
+    wire.after = path => path.endsWith('/finish') ? new Promise(r => { release = r }) : undefined
+    await click(button(host, 'Finish workout'))
+    const checkbox = row(host, 'squat|work|0').querySelector('[role=checkbox]')
+    const calls = wire.sent.filter(r => r.path.endsWith('/events')).length
+    const disabled = checkbox.matches(':disabled')
+    await act(async () => { checkbox.click(); void reppenStore.getState().logSet('squat', 'work', 0, { load: 1, reps: 1 }) })
+    await settle()
+    const after = wire.sent.filter(r => r.path.endsWith('/events')).length
+    await act(async () => release())
+    await settle()
+    expect(disabled).toBe(true)
+    expect(after).toBe(calls)
+    expect(host.querySelector('.rp-finished')).toBeTruthy()
+  })
+
   it('runs a workout from start to history', async () => {
     let host = await render(ReppenPrograms)
     await click(button(host, 'Start A1'))

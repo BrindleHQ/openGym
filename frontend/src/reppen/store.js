@@ -98,7 +98,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         rejected: [...get().rejected, ...get().outbox.filter(event => !accepted.has(event.id)).map(event => ({ workoutId: id, event, code: 'workoutFinished' }))] })
     }
     function enqueue(event) {
-      if (!get().workout) return Promise.resolve()
+      if (!get().workout || get().busy) return Promise.resolve()
       set({ outbox: [...get().outbox, { id: newId(), ...event }] })
       return get().flush()
     }
@@ -257,22 +257,23 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       /** After a start found another active workout: carry on with that one. */
       async continueActive() {
         const active = get().held?.active?.workoutId
-        if (!active) return
+        if (!active) return false
         save({ workoutId: active })
         set({ held: null })
-        await get().resume()
+        return !!(await get().resume())
       },
 
       /** After a start found another active workout: make the new one active in its place. */
       async continueHeld() {
         const { held } = get()
-        if (!held?.held?.workoutId) return
+        if (!held?.held?.workoutId) return false
         try {
           const view = await client.activate(held.held.workoutId, held.active?.workoutId ?? null)
           save({ workoutId: view.workoutId })
           adoptWorkout(view)
           set({ held: null, error: null })
-        } catch (e) { set({ error: e }) }
+          return true
+        } catch (e) { set({ error: e }); return false }
       },
 
       /** Fetches the workout in progress; forgets it once it is finished or gone. */
@@ -296,7 +297,10 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       logSet(slot, step, index, values) { return enqueue({ kind: 'setLogged', slot, step, set: index, values }) },
       clearSet(slot, step, index) { return enqueue({ kind: 'setCleared', slot, step, set: index }) },
       /** `question` is one of the workout's pendingQuestions; the occurrence goes back as Reppen sent it. */
-      answer(question, choice) { return enqueue({ kind: 'questionAnswered', question: question.id, occurrence: question.occurrence, value: choice.value }) },
+      answer(question, choice) {
+        if (get().outbox.some(e => e.kind === 'questionAnswered' && e.question === question.id && e.occurrence === question.occurrence)) return Promise.resolve()
+        return enqueue({ kind: 'questionAnswered', question: question.id, occurrence: question.occurrence, value: choice.value })
+      },
       dismissRejected() { set({ rejected: [] }) },
 
       /** All callers for this workout wait for the same draining run. */
