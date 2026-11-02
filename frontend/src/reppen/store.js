@@ -77,19 +77,32 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       try { storage.setItem(KEY(who), JSON.stringify(local)) } catch { /* private mode: kept for this page only */ }
       set({ local, localOwner: who })
     }
-    let again = false
+    let flushRun = null
+    function adoptWorkout(view) {
+      const previous = get().workout?.workoutId
+      const switching = previous && previous !== view.workoutId
+      set({ workout: view, ...(switching ? {
+        outbox: [], rejected: [...get().rejected, ...get().outbox.map(event => ({ workoutId: previous, event, code: 'workoutChanged' }))],
+      } : {}) })
+    }
+    function completedWorkout(id, error, events = []) {
+      const accepted = new Set(events.map(event => event.id))
+      save({ workoutId: null })
+      set({ workout: null, outbox: [], error,
+        rejected: [...get().rejected, ...get().outbox.filter(event => !accepted.has(event.id)).map(event => ({ workoutId: id, event, code: 'workoutFinished' }))] })
+    }
     function enqueue(event) {
       if (!get().workout) return Promise.resolve()
       set({ outbox: [...get().outbox, { id: newId(), ...event }] })
       return get().flush()
     }
     // A refused batch: true when the outbox was put right and can be sent again.
-    async function recover(e) {
-      const id = get().workout.workoutId
-      if (isRevisionConflict(e)) {
+    async function recover(e, id, current) {
+      if (isRevisionConflict(e) || e.code === 'workoutFinished') {
         // Fetch what Reppen holds; events of ours already among them were accepted (a lost answer).
         const view = await client.workout(id).catch(() => null)
-        if (!view) return false
+        if (!view || !current()) return false
+        if (view.status === 'completed') { completedWorkout(id, e, view.events); return true }
         const held = new Set((view.events || []).map(ev => ev.id))
         set({ workout: view, outbox: get().outbox.filter(ev => !held.has(ev.id)) })
         return true
@@ -101,6 +114,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         const ev = get().outbox.find(x => x.id === bad)
         if (!ev) return false
         const view = await client.workout(id).catch(() => null)
+        if (!current()) return false
         set({ outbox: get().outbox.filter(x => x.id !== bad), rejected: [...get().rejected, { event: ev, code: e.code }], ...(view ? { workout: view } : {}) })
         return true
       }
@@ -128,6 +142,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         const who = owner()
         if (get().localOwner === who) return
         generation++
+        flushRun = null
         set({ local: who ? readLocal(storage, who) : {}, localOwner: who, enrollmentView: null, error: null, catalogError: null, enrollmentError: null, busy: false,
           workout: null, outbox: [], rejected: [], held: null, finished: null, history: null, flushing: false })
       },
@@ -216,7 +231,11 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
           try {
             const view = await client.startWorkout(pending.workoutId, body)
             save({ pendingStart: null, workoutId: view.workoutId })
-            set({ workout: view, outbox: [], rejected: [] })
+            if (view.active === false) {
+              set({ held: { held: view, active: view.activeWorkout ?? null } })
+              return false
+            }
+            adoptWorkout(view)
             return true
           } catch (e) {
             // Another workout holds the active place (another device, a lost pointer): this one is
@@ -244,7 +263,8 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         try {
           const view = await client.activate(held.held.workoutId, held.active?.workoutId ?? null)
           save({ workoutId: view.workoutId })
-          set({ held: null, workout: view, outbox: [], rejected: [], error: null })
+          adoptWorkout(view)
+          set({ held: null, error: null })
         } catch (e) { set({ error: e }) }
       },
 
@@ -254,8 +274,10 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         if (!id) return null
         try {
           const view = await client.workout(id)
-          if (view.status === 'completed') { save({ workoutId: null }); set({ workout: null }); return null }
-          set({ workout: view, error: null })
+          if (get().local.workoutId !== id) return null
+          if (view.status === 'completed') { completedWorkout(id, null, view.events); return null }
+          adoptWorkout(view)
+          set({ error: null })
           return view
         } catch (e) {
           if (e.code === 'workoutNotFound') { save({ workoutId: null }); set({ workout: null }) }
@@ -270,28 +292,40 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       answer(question, choice) { return enqueue({ kind: 'questionAnswered', question: question.id, occurrence: question.occurrence, value: choice.value }) },
       dismissRejected() { set({ rejected: [] }) },
 
-      /** Sends the outbox. One run at a time; a call during a run makes the run go round again. */
-      async flush() {
-        if (get().flushing) { again = true; return }
-        set({ flushing: true })
-        try {
-          let tries = 0
-          do {
-            again = false
-            while (get().outbox.length && get().workout && tries < 5) {
-              tries++
+      /** All callers for this workout wait for the same draining run. */
+      flush() {
+        const id = get().workout?.workoutId
+        if (!id) return Promise.resolve()
+        if (flushRun?.id === id && flushRun.generation === generation) return flushRun.promise
+        const run = { id, generation }
+        const current = () => generation === run.generation && get().workout?.workoutId === id
+        flushRun = run
+        run.promise = Promise.resolve().then(async () => {
+          let failures = 0
+          while (current() && get().outbox.length) {
               const batch = get().outbox
-              const { workoutId, revision } = get().workout
+              const { revision } = get().workout
               try {
-                const view = await client.appendEvents(workoutId, revision, batch)
+                const view = await client.appendEvents(id, revision, batch)
+                if (!current()) return
                 const sent = new Set(batch.map(e => e.id))
                 set({ workout: view, outbox: get().outbox.filter(e => !sent.has(e.id)), error: null })
+                failures = 0
               } catch (e) {
-                if (!(await recover(e))) { set({ error: e }); return }
+                if (!current()) return
+                const before = get().outbox.length
+                const recovered = await recover(e, id, current)
+                if (!current()) return
+                if (!recovered) { set({ error: e }); return }
+                failures = get().outbox.length < before ? 0 : failures + 1
+                if (failures >= 5) { set({ error: e }); return }
               }
-            }
-          } while (again)
-        } finally { set({ flushing: false }) }
+          }
+        }).finally(() => {
+          if (flushRun === run) { flushRun = null; set({ flushing: false }) }
+        })
+        set({ flushing: true })
+        return run.promise
       },
 
       async finish() {

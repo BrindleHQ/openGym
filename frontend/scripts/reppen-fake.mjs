@@ -87,6 +87,7 @@ export function createFakeReppen({ now = () => new Date() } = {}) {
   const summary = w => ({ workoutId: w.workoutId, enrollmentId: w.enrollmentId, revision: w.events.length, eventCount: w.events.length, localDay: w.localDay, day: w.day, status: w.status })
   const view = (a, w) => ({
     ...summary(w), artifactId: ARTIFACT, execution: CATALOG[0].execution, active: a.active === w.workoutId,
+    ...(a.active && a.active !== w.workoutId ? { activeWorkout: summary(a.workouts.get(a.active)) } : {}),
     document: '{}', plan: w.plan, ...derive(w), events: w.events,
     ...(w.completed ? { completed: w.completed, statistics: { status: 'processed' } } : {}),
   })

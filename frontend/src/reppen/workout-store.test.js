@@ -2,7 +2,7 @@
 // the real client: what goes over the wire is what the store sends.
 import { describe, expect, it, vi } from 'vitest'
 import { createFakeReppen } from '../../scripts/reppen-fake.mjs'
-import { reppenClient } from './client.js'
+import { ReppenError, reppenClient } from './client.js'
 import { createReppenStore } from './store.js'
 
 function memoryStorage() {
@@ -15,10 +15,12 @@ function world() {
   const fake = createFakeReppen()
   const sent = []
   let drop = null   // which request's answer to lose, after the server applied it
+  let afterEvents = null
   const fetch = vi.fn(async (url, init) => {
     const body = init.body ? JSON.parse(init.body) : undefined
     sent.push({ method: init.method, path: url.replace(/^\/reppen/, ''), body })
     const { status, body: out } = fake.handle(init.method, url.replace(/^\/reppen/, ''), body, 'u1')
+    if (url.endsWith('/events')) await afterEvents?.()
     if (drop && drop(init.method, url)) { drop = null; throw new TypeError('Failed to fetch') }
     return new Response(JSON.stringify(out), { status })
   })
@@ -28,7 +30,7 @@ function world() {
     store.getState().hydrate()
     return store
   }
-  return { device, sent, loseAnswer: (method, suffix) => { drop = (m, url) => m === method && url.split('/').at(-1).startsWith(suffix) }, client }
+  return { device, sent, afterEvents: fn => { afterEvents = fn }, loseAnswer: (method, suffix) => { drop = (m, url) => m === method && url.split('/').at(-1).startsWith(suffix) }, client }
 }
 
 async function enrolled(w, store = w.device()) {
@@ -39,6 +41,120 @@ async function enrolled(w, store = w.device()) {
 const logWork = async (s, slot, n, values) => { for (let i = 0; i < n; i++) await s.getState().logSet(slot, 'work', i, values) }
 
 describe('Reppen store: a workout', () => {
+  it('waits for an in-flight event send when Finish is tapped', async () => {
+    const w = world(), s = await enrolled(w)
+    await s.getState().start('A1')
+    let release, started
+    const sending = new Promise(r => { started = r })
+    w.afterEvents(() => { started(); return new Promise(r => { release = r }) })
+    const logging = s.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    await sending
+    let settled = false
+    const finishing = s.getState().finish().then(result => { settled = true; return result })
+    await Promise.resolve(); await Promise.resolve()
+    expect(settled).toBe(false)
+    release()
+    await logging
+    expect(await finishing).toBe(true)
+  })
+
+  it('drains more than five successful batches queued during a running send', async () => {
+    const w = world(), s = await enrolled(w)
+    await s.getState().start('A1')
+    let batches = 0
+    w.afterEvents(() => { if (++batches < 7) void s.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 }) })
+    await s.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    expect(batches).toBe(7)
+    expect(s.getState().outbox).toEqual([])
+    expect(s.getState().workout.events).toHaveLength(7)
+  })
+
+  it('processes more than five rejected events without abandoning the rest', async () => {
+    const w = world(), s = await enrolled(w)
+    await s.getState().start('A1')
+    s.setState({ outbox: Array.from({ length: 8 }, () => ({ id: crypto.randomUUID(), kind: 'setLogged', slot: 'bench', step: 'work', set: 99, values: { load: 50, reps: 5 } })) })
+    await s.getState().flush()
+    expect(s.getState().outbox).toEqual([])
+    expect(s.getState().rejected).toHaveLength(8)
+  })
+
+  it('retains queued data and exposes an error after repeated conflicts without progress', async () => {
+    const w = world(), s = await enrolled(w)
+    await s.getState().start('A1')
+    const append = vi.spyOn(w.client, 'appendEvents').mockRejectedValue(new ReppenError(409, { error: 'revisionConflict' }))
+    await s.getState().logSet('bench', 'work', 0, { load: 50, reps: 5 })
+    expect(append).toHaveBeenCalledTimes(5)
+    expect(s.getState().outbox).toHaveLength(1)
+    expect(s.getState().error.code).toBe('revisionConflict')
+  })
+
+  it('recognizes accepted events after their response was lost and another device finished', async () => {
+    const w = world(), phone = await enrolled(w), laptop = w.device()
+    await phone.getState().start('A1')
+    laptop.setState({ local: { ...phone.getState().local } })
+    w.loseAnswer('POST', 'events')
+    await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 5 })
+    await laptop.getState().resume()
+    await laptop.getState().finish()
+    await phone.getState().flush()
+    expect(phone.getState().workout).toBe(null)
+    expect(phone.getState().outbox).toEqual([])
+    expect(phone.getState().rejected).toEqual([])
+  })
+
+  it('keeps late events as rejected drafts when another device finished the workout', async () => {
+    const w = world(), phone = await enrolled(w), laptop = w.device()
+    await phone.getState().start('A1')
+    laptop.setState({ local: { ...phone.getState().local } })
+    await laptop.getState().resume()
+    await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    await phone.getState().finish()
+    await laptop.getState().logSet('bench', 'work', 1, { load: 50, reps: 10 })
+    expect(laptop.getState().workout).toBe(null)
+    expect(laptop.getState().local.workoutId).toBe(null)
+    expect(laptop.getState().outbox).toEqual([])
+    expect(laptop.getState().rejected[0]).toMatchObject({ code: 'workoutFinished', event: { set: 1 } })
+  })
+
+  it.each(['lost', 'pending'])('never transfers a queued set to another workout after a %s response', async response => {
+    const w = world(), phone = await enrolled(w), laptop = w.device()
+    await phone.getState().start('A1')
+    const first = phone.getState().workout.workoutId
+    let release, started
+    const sending = new Promise(r => { started = r })
+    if (response === 'lost') w.loseAnswer('POST', 'events')
+    else w.afterEvents(() => { started(); return new Promise(r => { release = r }) })
+    const logging = phone.getState().logSet('squat', 'work', 0, { load: 100, reps: 5 })
+    if (response === 'lost') await logging; else await sending
+    const event = phone.getState().outbox[0]
+    laptop.setState({ local: { ...phone.getState().local, workoutId: null, pendingStart: null } })
+    await laptop.getState().start('B1')
+    await laptop.getState().continueHeld()
+    const second = laptop.getState().workout.workoutId
+    await phone.getState().start('A1')
+    await phone.getState().continueActive()
+    w.afterEvents(null)
+    if (release) { release(); await logging }
+    expect(phone.getState().workout.workoutId).toBe(second)
+    expect(phone.getState().rejected).toContainEqual({ workoutId: first, event, code: 'workoutChanged' })
+    await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    expect((await w.client.workout(second)).events.some(e => e.id === event.id)).toBe(false)
+    expect((await w.client.workout(first)).events.some(e => e.id === event.id)).toBe(true)
+  })
+
+  it('restores the activation choice after a lost held-start response', async () => {
+    const w = world(), phone = await enrolled(w), laptop = w.device()
+    await phone.getState().start('A1')
+    laptop.setState({ local: { ...phone.getState().local, workoutId: null } })
+    w.loseAnswer('PUT', '')
+    expect(await laptop.getState().start('B1')).toBe(false)
+    expect(laptop.getState().error.code).toBe('offline')
+    expect(await laptop.getState().start('B1')).toBe(false)
+    expect(laptop.getState().held.active.workoutId).toBe(phone.getState().workout.workoutId)
+    await laptop.getState().continueHeld()
+    expect(laptop.getState().workout).toMatchObject({ active: true, day: 'B1' })
+  })
+
   it('starts, logs sets by their issued keys with fresh event ids, answers, and finishes', async () => {
     const w = world()
     const s = await enrolled(w)
