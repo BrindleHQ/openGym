@@ -8,6 +8,9 @@ import { DEMO } from '../lib/demo.js'
 import { useStore } from '../store/useStore.js'
 import { tokenSource } from './token.js'
 import { reppenClient } from './client.js'
+import { createReppenStore } from './store.js'
+import { useStore as useZustand } from 'zustand'
+import { todayISO } from '../lib/format.js'
 
 export const reppenAvailable = (config, user, { mobile = MOBILE, demo = DEMO } = {}) =>
   !mobile && !demo && !!(config?.reppen === true && user?.id)
@@ -18,3 +21,7 @@ export const reppen = reppenClient({
   base: () => appBase().replace(/\/?$/, '/') + 'reppen/',
   token: opts => tokens.get(useStore.getState().user?.id, opts),
 })
+
+export const reppenStore = createReppenStore({ client: reppen, owner: () => useStore.getState().user?.id, today: todayISO })
+/** The Reppen store in a component, the way useStore is used everywhere else. */
+export const useReppen = selector => useZustand(reppenStore, selector)
