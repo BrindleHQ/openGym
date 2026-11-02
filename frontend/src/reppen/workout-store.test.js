@@ -296,6 +296,48 @@ describe('Reppen store: a workout', () => {
     await phone.getState().continueActive()
     expect(phone.getState().workout.day).toBe('B1')
   })
+
+  it('finishes a workout another device took the active place from', async () => {
+    const w = world()
+    const phone = await enrolled(w)
+    await phone.getState().start('A1')
+    await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    // A second browser has its own enrollment, and starts its workout in the phone's place.
+    const laptop = await enrolled(w)
+    expect(await laptop.getState().start('B1')).toBe(false)
+    await laptop.getState().continueHeld()
+    await laptop.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    // While the laptop's is active, the phone's Finish offers the choice a start would.
+    expect(await phone.getState().finish()).toBe(false)
+    expect(phone.getState().error).toBe(null)
+    expect(phone.getState().held).toMatchObject({ active: { workoutId: laptop.getState().workout.workoutId }, held: { workoutId: phone.getState().workout.workoutId } })
+    // Once that one is finished nothing is active: the phone's takes the place back and finishes.
+    expect(await laptop.getState().finish()).toBe(true)
+    expect(await phone.getState().finish()).toBe(true)
+    expect(phone.getState()).toMatchObject({ held: null, error: null, finished: { completed: { day: 'A1' } } })
+    expect(w.sent.filter(r => r.path.endsWith('/activate')).at(-1).body).toEqual({ replaces: null })
+  })
+
+  it('cannot finish a workout started before another one of its enrollment finished', async () => {
+    const w = world()
+    const phone = await enrolled(w)
+    await phone.getState().start('A1')
+    const stale = phone.getState().workout.workoutId
+    await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    // The laptop shares the phone's enrollment, takes the active place and finishes first.
+    const laptop = w.device()
+    laptop.setState({ local: { ...phone.getState().local, workoutId: null } })
+    await laptop.getState().start('B1')
+    await laptop.getState().continueHeld()
+    await laptop.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    expect(await laptop.getState().finish()).toBe(true)
+    // Nothing is active, so the phone's takes the place back; then Reppen refuses it for good, and
+    // the store says so rather than looping.
+    expect(await phone.getState().finish()).toBe(false)
+    expect(phone.getState().error).toMatchObject({ code: 'enrollmentConflict' })
+    expect(w.sent.filter(r => r.path.startsWith(`/v1/workouts/${stale}/`) && !r.path.endsWith('/events')).map(r => r.path.split('/').at(-1)))
+      .toEqual(['finish', 'activate', 'finish'])
+  })
 })
 
 // Two devices on one workout: the phone and the laptop, the laptop opened on the phone's workout.

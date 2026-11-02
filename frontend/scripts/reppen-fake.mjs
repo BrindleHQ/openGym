@@ -94,7 +94,7 @@ function derive(w) {
   return { effectivePlan: plan, pendingQuestions: pending }
 }
 
-export function createFakeReppen({ now = () => new Date() } = {}) {
+export function createFakeReppen() {
   const accounts = new Map()
   const of = sub => {
     if (!accounts.has(sub)) accounts.set(sub, { enrollments: new Map(), workouts: new Map(), active: null })
@@ -103,10 +103,10 @@ export function createFakeReppen({ now = () => new Date() } = {}) {
   const summary = w => ({ workoutId: w.workoutId, enrollmentId: w.enrollmentId, revision: w.events.length, eventCount: w.events.length, localDay: w.localDay, day: w.day, status: w.status })
   const view = (a, w) => ({
     ...summary(w), artifactId: ARTIFACT, execution: CATALOG[0].execution, active: a.active === w.workoutId,
-    document: '{}', plan: w.plan, ...derive(w), events: w.events,
+    document: JSON.stringify({ baseEnrollmentRevision: w.request.enrollmentRevision }), plan: w.plan, ...derive(w), events: w.events,
     // A held workout names the one that is active, as the real view does.
     ...(a.active && a.active !== w.workoutId && w.status === 'active' ? { activeWorkout: summary(a.workouts.get(a.active)) } : {}),
-    ...(w.completed ? { completed: w.completed, statistics: { status: 'processed' } } : {}),
+    ...(w.completed ? { completed: w.completed, statistics: { status: 'pending' } } : {}),
   })
 
   function findSlotSet(w, e) {
@@ -142,14 +142,23 @@ export function createFakeReppen({ now = () => new Date() } = {}) {
     return { status: 200, body: view(a, w) }
   }
 
+  // The refusal real Reppen gives a held workout's finish or a stale activate: both summaries (the
+  // active one is null when nothing is active) and the two ways forward.
+  const held = (a, w) => err(409, 'activeWorkoutExists', {
+    active: a.active ? summary(a.workouts.get(a.active)) : null, held: summary(w),
+    resolve: { continueHeld: `POST /v1/workouts/${w.workoutId}/activate {"replaces":${JSON.stringify(a.active)}}`, continueActive: a.active && `keep logging to ${a.active}` },
+  })
+
   function finish(a, w, body) {
-    if (w.completed) return { status: 200, body: { workout: view(a, { ...w, completed: null }), completed: w.completed, statistics: { status: 'processed' } } }
+    if (w.completed) return { status: 200, body: { workout: view(a, { ...w, completed: null }), completed: w.completed, statistics: { status: 'pending' } } }
     if (body.expectedRevision !== w.events.length) return err(409, 'revisionConflict', { currentRevision: w.events.length, missing: w.events.slice(body.expectedRevision) })
-    if (a.active !== w.workoutId) return err(409, 'activeWorkoutExists', {})
+    if (a.active !== w.workoutId) return held(a, w)
+    const e = a.enrollments.get(w.enrollmentId)
+    // Like real Reppen: a workout started before another one of the enrollment finished can never finish.
+    if (e.revision !== w.request.enrollmentRevision) return err(409, 'enrollmentConflict', { expectedRevision: w.request.enrollmentRevision, currentRevision: e.revision })
     if (derive(w).pendingQuestions.length) return err(422, 'refused', { code: 'questionsPending' })
     const at = logged(w.events)
     if (!at.size) return err(422, 'refused', { code: 'emptySession' })
-    const e = a.enrollments.get(w.enrollmentId)
     // Progression: every lift whose work sets were all logged at their target reps goes up 2.5.
     for (const slot of w.plan.slots) {
       const work = slot.steps[0]
@@ -157,7 +166,6 @@ export function createFakeReppen({ now = () => new Date() } = {}) {
     }
     e.revision++
     w.status = 'completed'
-    w.finishedAt = now().toISOString()
     w.completed = { format: 'reppen.completed-workout/1', workoutId: w.workoutId, enrollmentId: w.enrollmentId, artifactId: ARTIFACT, localDay: w.localDay, day: w.day, revision: w.events.length, enrollmentRevision: e.revision, events: w.events }
     a.active = null
     return finish(a, w, body)
@@ -194,7 +202,7 @@ export function createFakeReppen({ now = () => new Date() } = {}) {
         const e = a.enrollments.get(body.enrollmentId)
         if (!e) return err(404, 'enrollmentNotFound')
         if (e.revision !== body.enrollmentRevision) return err(409, 'enrollmentConflict', { expectedRevision: body.enrollmentRevision, currentRevision: e.revision })
-        if (!CATALOG[0].days.includes(body.day)) return err(400, 'invalidRequest', { reason: 'unknown day' })
+        if (!CATALOG[0].days.includes(body.day)) return err(422, 'refused', { reason: `prescribe: the program has no day ${body.day} (the shell must name a declared day)` })
         const nw = { workoutId: id, enrollmentId: body.enrollmentId, localDay: body.localDay, day: body.day, status: 'active', events: [], request: body, plan: basePlan(e, body.day) }
         a.workouts.set(id, nw)
         if (a.active) return err(409, 'activeWorkoutExists', { active: summary(a.workouts.get(a.active)), held: summary(nw) })
@@ -208,15 +216,18 @@ export function createFakeReppen({ now = () => new Date() } = {}) {
       if (method === 'POST' && action === 'activate') {
         if (w.status === 'completed') return err(409, 'workoutFinished', { revision: w.events.length })
         if (a.active !== id) {
-          if ((body.replaces ?? null) !== a.active) return err(409, 'activeWorkoutExists', {})
+          if ((body.replaces ?? null) !== a.active) return held(a, w)
           a.active = id
         }
         return { status: 200, body: view(a, w) }
       }
     }
     if (method === 'GET' && kind === 'history' && !id) {
-      const items = [...a.workouts.values()].filter(w => w.completed).sort((x, y) => (x.finishedAt < y.finishedAt ? 1 : -1))
-        .map(w => ({ source: 'program', workoutId: w.workoutId, date: w.localDay, localDay: w.localDay, format: 'reppen.completed-workout/1', dateBasis: 'local_day', finishedAt: w.finishedAt, artifactId: ARTIFACT, enrollmentId: w.enrollmentId, amendmentRevision: 0, visibilityRevision: 0 }))
+      // As real Reppen lists program workouts: newest day first, then by workout id, descending;
+      // it records no finish time for them.
+      const items = [...a.workouts.values()].filter(w => w.completed)
+        .sort((x, y) => (x.localDay !== y.localDay ? (x.localDay < y.localDay ? 1 : -1) : x.workoutId < y.workoutId ? 1 : -1))
+        .map(w => ({ source: 'program', workoutId: w.workoutId, date: w.localDay, localDay: w.localDay, format: 'reppen.completed-workout/1', dateBasis: 'program_local_day', finishedAt: null, contentId: null, artifactId: ARTIFACT, enrollmentId: w.enrollmentId, amendmentRevision: 0, visibilityRevision: 0 }))
       return { status: 200, body: { format: 'reppen.history/1', items: items.slice(0, Number(new URLSearchParams(query).get('limit')) || 20), nextCursor: null } }
     }
     return err(404, 'notFound')
@@ -265,7 +276,10 @@ export async function serve({ port = 8080, jwks = null } = {}) {
       let raw = ''
       for await (const chunk of req) raw += chunk
       const body = raw ? JSON.parse(raw) : null
-      const { status, body: out, headers = {} } = fake.handle(req.method, req.url, body, await subOf(req.headers.authorization), req.headers)
+      const sub = await subOf(req.headers.authorization)
+      const { status, body: out, headers = {} } = !sub && req.headers.authorization
+        ? { status: 401, body: { error: 'unauthenticated', reason: 'invalidToken' }, headers: { 'www-authenticate': 'Bearer error="invalid_token"' } }
+        : fake.handle(req.method, req.url, body, sub, req.headers)
       console.log(req.method, req.url, status)
       res.writeHead(status, { ...(status === 304 ? {} : { 'content-type': 'application/json' }), 'x-reppen-contract': 'reppen.workout-api/1', ...headers })
       res.end(status === 304 ? undefined : JSON.stringify(out))

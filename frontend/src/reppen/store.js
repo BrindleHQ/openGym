@@ -467,7 +467,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
 
       async finish() {
         if (get().busy) return false
-        set({ busy: true, error: null })
+        set({ busy: true, error: null, held: null })
         try {
           await get().flush()
           const { workout, outbox } = get()
@@ -481,6 +481,14 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
               finished(result)
               return true
             } catch (e) {
+              // This workout is held: another device started one in its place. With that one
+              // finished, nothing is active and this one takes the place back to finish; while it
+              // is still active, the person chooses, as when a start runs into it.
+              if (e.code === 'activeWorkoutExists' && tries < 2) {
+                if (e.body.active) { set({ held: e.body }); return false }
+                adopt(await client.activate(workout.workoutId, null))
+                continue
+              }
               if (!(isRevisionConflict(e) || e.code === 'workoutFinished') || tries >= 2) throw e
               // Another device logged or finished meanwhile: take that, and do not finish twice.
               adopt(await client.workout(workout.workoutId))
