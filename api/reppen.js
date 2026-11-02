@@ -106,3 +106,75 @@ export function openKeyStore(file, { now = () => Date.now() } = {}) {
     }
   };
 }
+
+/* Account erasure in Reppen. When an account is deleted here, Reppen is asked to erase its data
+ * too: POST /v1/account/erasure at REPPEN_API_URL with a token minted for the deleted account
+ * (the account record is gone by then; the key set still signs for its id). The request is a
+ * record in db.json (`reppenErasure`), written in the same save that removes the account, so a
+ * crash cannot lose one; it is sent in the background and retried, doubling from `retryMs` up to
+ * an hour, until Reppen answers 2xx, across restarts. The deletion never waits for Reppen. The
+ * commandId is fixed per record, so a retry after a lost answer is the same request to Reppen.
+ */
+export const ERASURE_MAX_DELAY_MS = 3600000;
+const ERASURE_TIMEOUT_MS = 15000;
+
+// `active` false (tokens off) keeps the records and sends nothing until a restart with tokens on.
+export function erasureSender({ db, save, mint, apiUrl, retryMs, active = true, log = console, now = () => Date.now() }) {
+  let running = false, again = false;
+  const pending = () => db().reppenErasure || [];
+
+  async function send(item) {
+    const r = await fetch(`${apiUrl}/v1/account/erasure`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${mint(item.sub).token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commandId: item.commandId, confirm: 'eraseAccount' }),
+      redirect: 'error',
+      signal: AbortSignal.timeout(ERASURE_TIMEOUT_MS)
+    });
+    await r.arrayBuffer().catch(() => {});
+    return r.status;
+  }
+
+  async function run() {
+    if (!active) return;
+    if (running) { again = true; return; }
+    running = true;
+    try {
+      do {
+        again = false;
+        for (const item of [...pending()]) {
+          if (item.nextAt > now()) continue;
+          let status = 0, failure = null;
+          try { status = await send(item); } catch (e) { failure = e.name === 'TimeoutError' ? 'timeout' : e.cause?.code || e.name; }
+          const list = pending(), i = list.indexOf(item);
+          if (i < 0) continue;
+          if (status >= 200 && status < 300) {
+            list.splice(i, 1);
+            log.log(`reppen: erasure of ${item.sub} accepted (${status})`);
+          } else {
+            item.attempts += 1;
+            item.nextAt = now() + Math.min(retryMs * 2 ** Math.min(item.attempts - 1, 30), ERASURE_MAX_DELAY_MS);
+            item.lastError = status ? `http ${status}` : failure;
+            log.warn(`reppen: erasure of ${item.sub} failed (${item.lastError}), attempt ${item.attempts}, retrying at ${new Date(item.nextAt).toISOString()}`);
+          }
+          try { save(); } catch (e) { log.error('reppen: could not save the erasure queue', e.message); }
+        }
+      } while (again);
+    } finally { running = false; }
+  }
+
+  return {
+    /** Records the erasure in db (the caller saves it with the deletion) and sends it soon. */
+    enqueue(sub) {
+      const d = db();
+      (d.reppenErasure ||= []).push({ sub, commandId: 'opengym-' + crypto.randomBytes(16).toString('base64url'), since: now(), attempts: 0, nextAt: now(), lastError: null });
+      setImmediate(() => { run().catch(e => log.error('reppen: erasure run', e)); });
+    },
+    start() {
+      const tick = () => { run().catch(e => log.error('reppen: erasure run', e)); };
+      setInterval(tick, retryMs).unref();
+      setImmediate(tick);
+    },
+    run
+  };
+}

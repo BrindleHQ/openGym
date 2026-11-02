@@ -281,6 +281,12 @@ node reppen-keys.js rotate --lead 0    # signing now: only if Reppen refetches o
 
 The previous key stays published until its last token has expired.
 
+With `REPPEN_API_URL` set as well (Reppen's base URL on the tailnet), deleting an account asks
+Reppen to erase it (`POST /v1/account/erasure`, with a token for that account). The request is
+saved in `db.json` with the deletion and retried, doubling from 30 seconds up to an hour, until
+Reppen answers 2xx, restarts included. The log says `reppen: erasure of <id> failed` while it
+waits.
+
 ## Security boundaries
 
 - Pull requests, including ones from forks, run only on GitHub-hosted runners, with a read-only

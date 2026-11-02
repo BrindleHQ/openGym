@@ -182,6 +182,8 @@ Read this before hosting openGym for anyone other than yourself.
   never logged, and only their public halves are served (`GET /api/reppen/jwks`). A session that
   no longer verifies (signed out everywhere, disabled) gets no token; one already issued stays
   valid until its `exp`, at most five minutes (`api/reppen.js`).
+  With `REPPEN_API_URL` set, deleting an account also asks Reppen to erase it, with a token for
+  that account; the request is saved with the deletion and retried until Reppen accepts it.
 - **Data is isolated per user by the session's uid.** `GET`/`PUT /api/data` only ever touch
   `state-<uid>.json` for the caller (both resolve it with `readSession`); no route lets a normal
   user name another user.

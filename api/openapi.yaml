@@ -658,7 +658,8 @@ paths:
         `/api/admin/user/delete`: the user record, their passkeys, their push
         subscriptions, their live presence, their training history file, their
         uploaded photos and videos (`DATA_DIR/uploads/<uid>/`) and any Coach credential
-        stored for them. Not reversible. The body carries the account's name, typed back
+        stored for them. With `REPPEN_API_URL` set, Reppen is asked to erase the account
+        too, in the background, retried until it accepts. Not reversible. The body carries the account's name, typed back
         by its owner, and the same proof as setting a password (see OwnerProof): a
         passkey assertion made for this request, or the current password while
         `PASSWORD_LOGIN` is on. A paired phone (Bearer token) cannot hold a passkey for
