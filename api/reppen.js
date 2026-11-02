@@ -75,11 +75,15 @@ export function openKeyStore(file, { now = () => Date.now() } = {}) {
   const signing = t => published(t).filter(k => k.activeFrom <= t).sort((a, b) => b.activeFrom - a.activeFrom)[0];
 
   return {
-    mint(sub, { issuer, audience }) {
+    // `scope` is set only by this server's own account-erasure requests; a session's token never
+    // carries one, so a signed-in browser cannot ask Reppen to erase anything.
+    mint(sub, { issuer, audience }, scope) {
       const key = signing(now());
       const iat = Math.floor(now() / 1000);
       const head = b64u(JSON.stringify({ alg: 'EdDSA', typ: 'JWT', kid: key.kid }));
-      const body = b64u(JSON.stringify({ iss: issuer, aud: audience, sub, iat, nbf: iat, exp: iat + TOKEN_TTL_S }));
+      const claims = { iss: issuer, aud: audience, sub, iat, nbf: iat, exp: iat + TOKEN_TTL_S };
+      if (scope) claims.scope = scope;
+      const body = b64u(JSON.stringify(claims));
       const sig = crypto.sign(null, Buffer.from(`${head}.${body}`), privateOf(key));
       return { token: `${head}.${body}.${b64u(sig)}`, expiresAt: iat + TOKEN_TTL_S };
     },
@@ -109,6 +113,7 @@ export function openKeyStore(file, { now = () => Date.now() } = {}) {
 
 /* Account erasure in Reppen. When an account is deleted here, Reppen is asked to erase its data
  * too: POST /v1/account/erasure at REPPEN_API_URL with a token minted for the deleted account
+ * carrying `scope: "account.erase"`, which Reppen requires on that route
  * (the account record is gone by then; the key set still signs for its id). The request is a
  * record in db.json (`reppenErasure`), written in the same save that removes the account, so a
  * crash cannot lose one; it is sent in the background and retried, doubling from `retryMs` up to
