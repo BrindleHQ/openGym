@@ -97,7 +97,7 @@ export function withOfflineQueue(store, { client, owner, storage, today, newId, 
   function hydrate() {
     const account = owner()
     if (account === who && store.getState().localOwner === account) { base.hydrate(); return }
-    release?.(); release = null; epoch++; replaying = null; reconciling = null; persistError = null; unreadable = false
+    release?.(); release = null; epoch++; replaying = null; finishing = null; reconciling = null; persistError = null; unreadable = false
     loading = true; writable = false; who = account
     let saved = null
     try {
@@ -272,8 +272,9 @@ export function withOfflineQueue(store, { client, owner, storage, today, newId, 
   }
   function finish() {
     if (finishing) return finishing
-    finishing = finishOnce().finally(() => { finishing = null })
-    return finishing
+    const promise = finishOnce().finally(() => { if (finishing === promise) finishing = null })
+    finishing = promise
+    return promise
   }
   store.setState({
     hydrate, flush, start, finish,

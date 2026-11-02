@@ -257,6 +257,36 @@ describe('durable offline workout chain', () => {
     w.owner('one'); s.getState().hydrate()
     expect(s.getState().offlineJournal).toHaveLength(1)
   })
+  it('can finish after changing accounts while an older Finish is in flight', async () => {
+    const w = world(), s = w.device()
+    const enrollment = copy(s.getState().local.enrollment)
+    await s.getState().start('A')
+    await s.getState().logSet('s', 'work', 0, { load: 100, reps: 5 })
+    const oldWorkout = copy(s.getState().workout)
+    let resolveOld
+    w.client.finish.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+    const oldFinish = s.getState().finish()
+    await vi.waitFor(() => expect(resolveOld).toBeTypeOf('function'))
+
+    w.owner('two'); s.getState().hydrate()
+    s.setState({ local: { enrollment } })
+    await s.getState().start('A')
+    await s.getState().logSet('s', 'work', 0, { load: 100, reps: 5 })
+    const newId = s.getState().workout.workoutId
+    const newFinish = s.getState().finish()
+    expect(newFinish).not.toBe(oldFinish)
+    resolveOld({ workout: { ...oldWorkout, status: 'completed' }, completed: { enrollmentRevision: 1 } })
+    expect(await newFinish).toBe(true)
+    expect(w.deliveries).toHaveLength(1)
+    expect(w.deliveries[0].workout.workoutId).toBe(newId)
+    expect(s.getState().localOwner).toBe('two')
+    w.owner('one'); s.getState().hydrate()
+    const resumedFinish = s.getState().finish()
+    expect(resumedFinish).not.toBe(oldFinish)
+    expect(await resumedFinish).toBe(true)
+    expect(w.deliveries).toHaveLength(2)
+    expect(w.deliveries[1].workout.workoutId).toBe(oldWorkout.workoutId)
+  })
 })
 
 it('matches every authoritative C1 live-target vector', () => {
