@@ -161,7 +161,7 @@ db.deviceLinks = db.deviceLinks || [];   // unused one-time device links, hashed
 // the token settings missing they are kept, and go out once a restart has them.
 const REPPEN_ERASURE_RETRY_MS = Math.max(50, +(process.env.REPPEN_ERASURE_RETRY_MS || 30000) || 30000);
 const reppenErasure = REPPEN.apiUrl
-  ? erasureSender({ db: () => db, save: () => saveDb(), mint: sub => reppenKeys.mint(sub, REPPEN), apiUrl: REPPEN.apiUrl, retryMs: REPPEN_ERASURE_RETRY_MS, active: REPPEN.enabled })
+  ? erasureSender({ db: () => db, save: () => saveDb(), mint: sub => reppenKeys.mint(sub, REPPEN, 'account.erase'), apiUrl: REPPEN.apiUrl, retryMs: REPPEN_ERASURE_RETRY_MS, active: REPPEN.enabled })
   : null;
 if (REPPEN.apiUrl && !REPPEN.enabled) console.warn('REPPEN_API_URL is set but Reppen tokens are off (REPPEN_TOKEN_ISSUER, REPPEN_TOKEN_AUDIENCE): erasures of deleted accounts are kept and not sent until both are set');
 reppenErasure?.start();

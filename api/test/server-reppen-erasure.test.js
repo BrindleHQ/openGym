@@ -108,6 +108,7 @@ test('a deleted account is erased in Reppen: retried while it fails, across a re
   const claims = claimsVerified(first.auth.replace(/^Bearer /, ''), jwks);
   assert.equal(claims.sub, USER.id, 'a token for the deleted account');
   assert.equal(claims.aud, 'reppen-test');
+  assert.equal(claims.scope, 'account.erase', 'only erasure tokens carry the erase scope');
 
   // Down for good mid-retry; Reppen recovers meanwhile.
   await h.stop();
