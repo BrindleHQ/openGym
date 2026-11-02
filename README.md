@@ -179,6 +179,7 @@ Traefik and nginx, and there are separate guides for
 | `PASSWORD_LOGIN` | Offer name-and-password sign-in next to passkeys | *(off)* |
 | `REPPEN_TOKEN_ISSUER` | `iss` of the Reppen access tokens this instance mints, its public origin. With `REPPEN_TOKEN_AUDIENCE`, turns on `/api/reppen/*` | *(off)* |
 | `REPPEN_TOKEN_AUDIENCE` | `aud` of those tokens, the Reppen environment (e.g. `reppen-staging`) | *(off)* |
+| `REPPEN_API_URL` | Reppen's base URL: a deleted account is erased there too (`POST /v1/account/erasure`, retried until accepted). Sent only while the two above are set, kept until then | *(none)* |
 | `TRUST_PROXY` | Let the sign-in throttle read the client address from proxy headers | `1` in `docker-compose.yml` |
 | `AUDIT_LOG` | Record sign-ins and admin actions; `0` records nothing | *(on)* |
 | `AUDIT_MAX` | Events kept in the activity log; `0` for no limit | `5000` |
