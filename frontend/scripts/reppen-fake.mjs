@@ -9,8 +9,9 @@
  *   createFakeReppen()  in-process: { handle(method, path, body, sub) -> { status, body } }
  *   node scripts/reppen-fake.mjs --port 8080 [--jwks http://127.0.0.1:3000/api/reppen/jwks]
  *     serves it over HTTP. With --jwks every request needs a Bearer token that verifies against
- *     that key set (EdDSA, exp/nbf), the way the real service checks OpenGym's tokens; the
- *     token's `sub` is the account. Without it any Bearer is accepted as account "dev".
+ *     that cached key set (EdDSA, exp/nbf); the token's `sub` is the account. This development
+ *     stand-in does not verify issuer/audience or model key retirement. Authentication acceptance
+ *     tests must use the real backend. Without --jwks any Bearer is accepted as account "dev".
  */
 import http from 'node:http'
 import crypto from 'node:crypto'
@@ -68,7 +69,7 @@ function derive(w) {
   const workSets = squat.steps[0].sets.length
   const workDone = Array.from({ length: workSets }, (_, i) => at.get(`squat|work|${i}`)).filter(Boolean)
   if (answer?.value?.b === true) {
-    const top = Math.max(...workDone.map(e => e.values.load || 0))
+    const top = workDone.length ? Math.max(...workDone.map(e => e.values.load || 0)) : squat.steps[0].sets[0].metrics.load.v.v
     squat.steps.push({ id: 'backoff', key: 'backoff', count: { k: 'n', n: 1 }, sets: [set('backoff', 8, round(top * 0.9), 'atLeast')], block: null, live: { from: 'squat.work', factor: 0.9 } })
   }
   const pending = !answer && workDone.length === workSets
@@ -99,7 +100,7 @@ export function createFakeReppen({ now = () => new Date() } = {}) {
   function events(a, w, body) {
     if (w.status === 'completed') return err(409, 'workoutFinished', { revision: w.events.length })
     const { expectedRevision: rev, events: batch } = body
-    if (!Number.isInteger(rev) || !Array.isArray(batch)) return err(400, 'invalidRequest', { reason: 'expectedRevision and events are required' })
+    if (!Number.isInteger(rev) || rev < 0 || !Array.isArray(batch) || batch.some(e => !e || typeof e !== 'object' || Array.isArray(e))) return err(400, 'invalidRequest', { reason: 'nonnegative expectedRevision and object events are required' })
     // Replays of events already held at the same positions are no-ops; the rest must start at the head.
     let i = 0
     for (; i < batch.length && rev + i < w.events.length; i++) {
@@ -219,7 +220,11 @@ async function verifier(jwksUrl) {
   return async auth => {
     const m = /^Bearer ([\w-]+)\.([\w-]+)\.([\w-]+)$/.exec(auth || '')
     if (!m) return null
-    const head = b64json(m[1]), claims = b64json(m[2])
+    let head, claims
+    try {
+      head = b64json(m[1]); claims = b64json(m[2])
+      if (!head || !claims) return null
+    } catch { return null }
     if (head.alg !== 'EdDSA') return null
     if (!keys.has(head.kid)) await load()
     const key = keys.get(head.kid)
@@ -233,14 +238,18 @@ export async function serve({ port = 8080, jwks = null } = {}) {
   const fake = createFakeReppen()
   const subOf = await verifier(jwks)
   const server = http.createServer(async (req, res) => {
-    let raw = ''
-    for await (const chunk of req) raw += chunk
-    let body = null
-    try { body = raw ? JSON.parse(raw) : null } catch { body = null }
-    const { status, body: out } = fake.handle(req.method, req.url, body, await subOf(req.headers.authorization))
-    console.log(req.method, req.url, status)
-    res.writeHead(status, { 'content-type': 'application/json', 'x-reppen-contract': 'reppen.workout-api/1' })
-    res.end(JSON.stringify(out))
+    try {
+      let raw = ''
+      for await (const chunk of req) raw += chunk
+      const body = raw ? JSON.parse(raw) : null
+      const { status, body: out } = fake.handle(req.method, req.url, body, await subOf(req.headers.authorization))
+      console.log(req.method, req.url, status)
+      res.writeHead(status, { 'content-type': 'application/json', 'x-reppen-contract': 'reppen.workout-api/1' })
+      res.end(JSON.stringify(out))
+    } catch {
+      res.writeHead(400, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ error: 'invalidRequest' }))
+    }
   })
   await new Promise(r => server.listen(port, '127.0.0.1', r))
   return server
