@@ -9,6 +9,7 @@ import { useStore } from '../store/useStore.js'
 import { tokenSource } from './token.js'
 import { reppenClient } from './client.js'
 import { createReppenStore } from './store.js'
+import { addManaged, hasManaged, managedWorkout } from './history.js'
 import { useStore as useZustand } from 'zustand'
 import { todayISO } from '../lib/format.js'
 
@@ -22,6 +23,16 @@ export const reppen = reppenClient({
   token: opts => tokens.get(useStore.getState().user?.id, opts),
 })
 
-export const reppenStore = createReppenStore({ client: reppen, owner: () => useStore.getState().user?.id, today: todayISO })
+// A finished Reppen workout goes into this profile's history once (history.js). Checked before
+// update(), so a delivery that finds it already there changes nothing and pushes nothing.
+function recordFinished(result, { title, names }) {
+  const { S, update } = useStore.getState()
+  const id = (result?.workout || result)?.workoutId
+  if (!S || !id || hasManaged(S, id)) return
+  const made = managedWorkout(result, { title, names, unit: S.unit })
+  if (made) update(s => { addManaged(s, made) })
+}
+
+export const reppenStore = createReppenStore({ client: reppen, owner: () => useStore.getState().user?.id, today: todayISO, recordFinished })
 /** The Reppen store in a component, the way useStore is used everywhere else. */
 export const useReppen = selector => useZustand(reppenStore, selector)

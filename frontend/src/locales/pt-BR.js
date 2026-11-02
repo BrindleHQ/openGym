@@ -1692,6 +1692,7 @@ export const PT_BR_OVERRIDES = {
   'Workout saved': 'Treino salvo',
   'Your Reppen data is being deleted.': 'Seus dados do Reppen estão sendo apagados.',
   'Your program': 'Seu programa',
+  'Your Reppen program saved this workout. It cannot be changed here.': 'Seu programa Reppen salvou este treino. Ele não pode ser alterado aqui.',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

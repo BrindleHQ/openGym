@@ -2704,4 +2704,5 @@ export default {
   'Your Reppen data is being deleted.': 'আপনার Reppen ডেটা মুছে ফেলা হচ্ছে।',
   'Your program': 'আপনার প্রোগ্রাম',
   'calculated': 'হিসাব করা',
+  'Your Reppen program saved this workout. It cannot be changed here.': 'আপনার Reppen প্রোগ্রাম এই ওয়ার্কআউটটি সেভ করেছে। এখানে এটি বদলানো যাবে না।',
 }

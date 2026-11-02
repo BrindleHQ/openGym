@@ -2625,4 +2625,5 @@ export default {
   'Your Reppen data is being deleted.': 'आपका Reppen डेटा हटाया जा रहा है।',
   'Your program': 'आपका प्रोग्राम',
   'calculated': 'गणना किया गया',
+  'Your Reppen program saved this workout. It cannot be changed here.': 'आपके Reppen प्रोग्राम ने यह वर्कआउट सेव किया है। इसे यहाँ बदला नहीं जा सकता।',
 }
