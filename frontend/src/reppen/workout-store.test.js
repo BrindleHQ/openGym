@@ -242,6 +242,18 @@ describe('Reppen store: a workout', () => {
     expect(s.getState().workout.revision).toBe(1)   // applied once, not twice
   })
 
+  it('clears the error a lost answer left once a catch-up finds the event accepted', async () => {
+    const w = world()
+    const s = await enrolled(w)
+    await s.getState().start('A1')
+    w.loseAnswer('POST', 'events')
+    await s.getState().logSet('squat', 'work', 0, { load: 100, reps: 5 })
+    expect(s.getState().error.code).toBe('offline')
+    await s.getState().catchUp()
+    expect(s.getState().outbox).toEqual([])
+    expect(s.getState().error).toBe(null)
+  })
+
   it('catches up with another device, then sends what is still its own', async () => {
     const w = world()
     const phone = await enrolled(w)
@@ -391,6 +403,16 @@ describe('Reppen store: two devices on one workout', () => {
     w.client.appendEvents = real
     expect(laptop.getState().error).toBe(null)
     expect(laptop.getState().finished).not.toBe(null)
+  })
+
+  it('offers the way out on catch-up when a third device made another workout active', async () => {
+    const { w, phone, laptop } = await twoDevices()
+    const tablet = w.device()
+    tablet.setState({ local: { ...phone.getState().local, workoutId: null } })
+    expect(await tablet.getState().start('B1')).toBe(false)
+    await tablet.getState().continueHeld()
+    await laptop.getState().catchUp()
+    expect(laptop.getState().held.active.workoutId).toBe(tablet.getState().workout.workoutId)
   })
 
   it('moves the other device to the finished state without finishing again', async () => {

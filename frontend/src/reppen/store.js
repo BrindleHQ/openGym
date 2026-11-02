@@ -138,6 +138,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       catch { /* the Reppen side is done; the copy in OpenGym's history is retried on the next delivery */ }
     }
     let catching = null
+    let sendError = null   // the error the last failed send left showing, for catch-up to clear
     // Every event made here, with the workout revision this device had seen when it was made.
     const seenAt = new Map()
     function enqueue(event) {
@@ -165,10 +166,10 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
           .some(x => isSetEvent(x) && !seenAt.has(x.id) && samePos(x, ev))
         if (taken) lost.push({ event: ev, code: 'setTaken' }); else outbox.push(ev)
       }
-      if (view.status !== 'completed') { set({ workout: view, outbox, rejected: [...get().rejected, ...lost] }); return }
+      if (view.status !== 'completed') { set({ workout: view, outbox, rejected: [...get().rejected, ...lost], held: heldBy(view) }); return }
       const { enrollment } = get().local
       save({ workoutId: null, nextDay: suggestNextDay(enrollment?.days, view.day, enrollment?.defaultDay) })
-      set({ workout: null, outbox: [], finished: { workout: view, completed: view.completed },
+      set({ workout: null, outbox: [], held: null, finished: { workout: view, completed: view.completed },
         rejected: [...get().rejected, ...lost, ...outbox.map(event => ({ event, code: 'workoutFinished' }))] })
       finished(view)
     }
@@ -417,6 +418,8 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         catching ??= client.workout(id).then(view => {
           adopt(view)
           if (get().outbox.length) return get().flush()
+          // Everything a failed send left waiting is settled now, so its error no longer applies.
+          if (sendError && get().error === sendError) set({ error: null })
         }, () => {}).finally(() => { catching = null })
         return catching
       },
@@ -445,9 +448,9 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
                 const before = get().outbox.length
                 const recovered = await recover(e, id, current)
                 if (!current()) return
-                if (!recovered) { set({ error: e }); return }
+                if (!recovered) { sendError = e; set({ error: e }); return }
                 failures = get().outbox.length < before ? 0 : failures + 1
-                if (failures >= 5) { set({ error: e }); return }
+                if (failures >= 5) { sendError = e; set({ error: e }); return }
               }
           }
         }).finally(() => {
