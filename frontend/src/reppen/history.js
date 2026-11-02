@@ -46,9 +46,10 @@ export function managedWorkout(result, { title, names, unit }) {
   for (const slot of plan?.slots || []) {
     const sets = []
     for (const step of slot.steps || []) {
-      (step.sets || []).forEach((_, i) => {
+      (step.sets || []).forEach((planned, i) => {
         const v = logged.get(posKey(slot.slot, step.key, i))?.values
-        if (v) sets.push({ w: Number(convertWeight(v.load ?? 0, from, unit)) || 0, r: Number(v.reps) || 0, done: true })
+        if (v) sets.push({ w: Number(convertWeight(v.load ?? 0, from, unit)) || 0, r: Number(v.reps) || 0, done: true,
+          ...(planned.role === 'warmup' ? { phase: 'warmup' } : {}) })
       })
     }
     if (!sets.length) continue
@@ -80,7 +81,11 @@ export function hasManaged(S, workoutId) {
 export function addManaged(S, made) {
   if (!made || hasManaged(S, made.workout.managed.workoutId)) return false
   const known = new Set((S.customEx || []).map(e => e?.id))
-  const missing = made.exercises.filter(e => !known.has(e.id))
+  const missing = made.exercises.filter(e => {
+    if (known.has(e.id)) return false
+    known.add(e.id)
+    return true
+  })
   if (missing.length) S.customEx = [...(S.customEx || []), ...missing]
   // The list is kept in date order (History and Stats read it so); a workout delivered late goes
   // where its day puts it.

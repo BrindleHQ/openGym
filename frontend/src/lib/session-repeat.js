@@ -40,7 +40,7 @@ export function repeatSessionEntries(st, w, { exists = id => !!EXIDX[id] } = {})
     const step = modeOf(cfg) === 'reps' ? weightIncrement(cfg, st?.unit) : defaultIncrement(cfg.id, st?.unit)
     // Only this entry of this workout is history here, so a later session of the same exercise,
     // or the same exercise twice in one workout, does not seed the rows.
-    const only = { ...st, workouts: [{ ...w, entries: [source] }] }
+    const only = { ...st, workouts: [{ ...w, managed: undefined, entries: [source] }] }
     const sets = applyIntensifierPlan(buildSets(only, cfg, { step, preferLast: true }), cfg, dropGrid(st, cfg))
       .map(row => ({ ...row, done: false }))
     entries.push({ id: cfg.id, ...(sg ? { sg } : {}), target: { ...cfg }, plan: null, sets })

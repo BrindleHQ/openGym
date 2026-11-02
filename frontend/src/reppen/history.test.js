@@ -5,6 +5,7 @@ import { createFakeReppen } from '../../scripts/reppen-fake.mjs'
 import { addManaged, hasManaged, managedWorkout } from './history.js'
 import { entryExcluded } from '../lib/history.js'
 import { queueDone, queueNext } from '../lib/queue.js'
+import { repeatSessionEntries } from '../lib/session-repeat.js'
 
 const NAMES = { 'wger:111': 'Barbell Back Squat', 'wger:192': 'Barbell Bench Press' }
 
@@ -28,6 +29,26 @@ function finishedA1() {
 const made = (result = finishedA1(), unit = 'kg') => managedWorkout(result, { title: 'GZCLP', names: NAMES, unit })
 
 describe('a Reppen workout in OpenGym history', () => {
+  it('repeats individual managed sets without making the original progression eligible', () => {
+    const { workout } = made()
+    workout.entries[0].sets = [{ w: 100, r: 5, done: true }, { w: 90, r: 8, done: true }]
+    const { entries } = repeatSessionEntries({ unit: 'kg', routines: [] }, workout, { exists: () => true })
+    expect(entries[0].sets.map(s => [s.w, s.r, s.done])).toEqual([[100, 5, false], [90, 8, false]])
+    expect(entryExcluded(workout, workout.entries[0])).toBe(true)
+  })
+
+  it('preserves warmup roles and adds a shared exercise definition only once', () => {
+    const result = finishedA1()
+    const plan = result.workout.effectivePlan || result.workout.plan
+    plan.slots[0].steps[0].sets[0].role = 'warmup'
+    plan.slots[1].exercise = structuredClone(plan.slots[0].exercise)
+    const imported = made(result)
+    expect(imported.workout.entries[0].sets[0].phase).toBe('warmup')
+    const profile = { workouts: [], customEx: [] }
+    addManaged(profile, imported)
+    expect(profile.customEx).toHaveLength(1)
+    expect(profile.workouts[0].entries).toHaveLength(2)
+  })
   it('becomes one managed workout: the logged sets by exercise, on its own day', () => {
     const { workout, exercises } = made()
     expect(workout).toMatchObject({
