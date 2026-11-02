@@ -266,7 +266,9 @@ to the release before it.
 
 OpenGym signs people in to the self-hosted Reppen service. Set `REPPEN_TOKEN_ISSUER` (this
 instance's public origin) and `REPPEN_TOKEN_AUDIENCE` (`reppen-staging` or `reppen-production`)
-to turn it on; without both, `/api/reppen/*` answers 404. The app gets a five-minute token from
+to turn it on; without both, `/api/reppen/*` answers 404. `deploy/coolify-compose.yml` does not pass
+these variables yet, so staging and production run with the feature off until the Reppen deployment
+change adds them per environment. The app gets a five-minute token from
 `POST /api/reppen/token`, and Reppen verifies it with the keys at `GET /api/reppen/jwks`. The
 signing keys are made on first start in `/data/reppen-keys.json` (0600), separate per environment
 like the rest of `/data`, and are in the backup with it.
