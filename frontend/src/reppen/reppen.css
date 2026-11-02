@@ -1,0 +1,21 @@
+/* The Reppen runner (ReppenWorkout.jsx). Loaded with its chunk; the cards, fields and checkboxes
+   are the app's own, only the set rows' layout is here. */
+.reppen .rp-slot h2,.reppen .rp-question h2,.reppen .rp-finished h2{margin:0 0 8px}
+.reppen .rp-step+.rp-step{border-top:.5px solid var(--sep);margin-top:6px;padding-top:6px}
+.reppen .rp-set{display:flex;align-items:center;gap:10px;padding:6px 0}
+.reppen .rp-set.pending{opacity:.6}
+.reppen .rp-set.done .num{color:var(--label-2)}
+.reppen .rp-n{width:2.6em;font-weight:600;display:flex;flex-direction:column;line-height:1.1}
+.reppen .rp-n small{font-size:11px;font-weight:500;color:var(--label-2);text-transform:uppercase}
+.reppen .rp-m{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.reppen .num{
+  width:100%;min-width:0;min-height:40px;text-align:center;background:var(--surface-2);border:none;outline:none;
+  border-radius:10px;font-size:17px;font-weight:500;letter-spacing:-.012em;padding:0 6px;
+}
+.reppen .num:disabled{color:var(--label-2);opacity:1;-webkit-text-fill-color:var(--label-2)}
+.reppen .reppen-reading{padding:6px 0;gap:10px}
+.reppen .reppen-reading .num{width:6em}
+.reppen .rp-t{font-size:12px;color:var(--label-2)}
+.reppen .rp-finish{margin:16px 0 24px;display:flex;flex-direction:column;align-items:stretch}
+.reppen .reppen-error{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.reppen .reppen-days{padding:8px 12px}

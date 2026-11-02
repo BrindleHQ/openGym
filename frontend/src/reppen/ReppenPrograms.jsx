@@ -9,6 +9,8 @@ import { Button, NumberField, Row, Section, Segmented, SelectRow } from '../comp
 import { reppenAvailable, reppenStore, useReppen } from './connection.js'
 import { massReadings, unaskedParameters } from './store.js'
 import { errorText } from './messages.js'
+import { fmtDate } from '../lib/format.js'
+import './reppen.css'
 
 const actions = () => reppenStore.getState()
 
@@ -47,13 +49,40 @@ function EnrollForm({ entry, replaces, onDone }) {
   </div>
 }
 
-function NextWorkout({ enrollment, nextDay }) {
+function NextWorkout({ enrollment, nextDay, workoutId, nav }) {
   const days = enrollment.days || []
+  const busy = useReppen(s => s.busy)
+  const start = async () => { if (await actions().start(nextDay)) nav('/reppen/workout') }
   return <Section title={t('Your program')}>
     <Row icon="dumbbell" title={enrollment.title} subtitle={nextDay ? t('Next workout: {0}', nextDay) : null} />
     {days.length > 1 && (days.length <= 4
       ? <div className="reppen-days"><Segmented value={nextDay} onChange={d => actions().chooseDay(d)} options={days.map(d => ({ value: d, label: d }))} /></div>
       : <SelectRow title={t('Day')} value={nextDay} onChange={d => actions().chooseDay(d)} options={days.map(d => ({ value: d, label: d }))} />)}
+    <div className="reppen-days">
+      {workoutId
+        ? <Button variant="filled" icon="play" onClick={() => nav('/reppen/workout')}>{t('Resume workout')}</Button>
+        : <Button variant="filled" icon="play" disabled={!nextDay || busy} onClick={start}>{t('Start {0}', nextDay || '')}</Button>}
+    </div>
+  </Section>
+}
+
+// A start found another workout active (another device, or one this browser lost track of).
+export function Held({ held, nav }) {
+  const go = async fn => { await fn(); if (reppenStore.getState().workout) nav('/reppen/workout') }
+  return <div className="card rp-held" role="alert">
+    <p>{t('Another workout is already in progress: {0}, {1} entries logged.', held.active?.day ?? '?', held.active?.eventCount ?? 0)}</p>
+    <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+      <Button variant="filled" onClick={() => go(actions().continueActive)}>{t('Continue that workout')}</Button>
+      <Button onClick={() => go(actions().continueHeld)}>{t('Start this one instead')}</Button>
+    </div>
+  </div>
+}
+
+function History({ items, catalog }) {
+  const titleOf = artifactId => catalog?.find(e => e.artifactId === artifactId)?.title
+  return <Section title={t('Reppen history')} footer={items && !items.length ? t('Finished workouts show here.') : null}>
+    {(items || []).map(h => <Row key={h.workoutId} icon="history" title={fmtDate(h.localDay || h.date, true, true)}
+      subtitle={titleOf(h.artifactId) || (h.source === 'manual' ? t('Logged by hand') : null)} />)}
   </Section>
 }
 
@@ -64,6 +93,8 @@ export default function ReppenPrograms() {
   const local = useReppen(s => s.local)
   const catalog = useReppen(s => s.catalog)
   const error = useReppen(s => s.error)
+  const held = useReppen(s => s.held)
+  const history = useReppen(s => s.history)
   const [picking, setPicking] = useState(null)
   const ok = reppenAvailable(config, user)
 
@@ -72,6 +103,9 @@ export default function ReppenPrograms() {
     actions().hydrate()
     actions().loadCatalog()
     actions().loadEnrollment()
+    actions().loadHistory()
+    // A workout in progress may be held back by another one active elsewhere: resume says so.
+    actions().resume()
   }, [ok, user?.id])
 
   if (!config) return null
@@ -85,7 +119,8 @@ export default function ReppenPrograms() {
       <div style={{ flex: 1, marginInlineStart: 12 }}><h1>{t('Programs')}</h1><div className="sub">Reppen</div></div>
     </div>
     {error && <div className="card reppen-error" role="alert">{errorText(error)}</div>}
-    {enrollment && <NextWorkout enrollment={enrollment} nextDay={nextDay} />}
+    {held && <Held held={held} nav={nav} />}
+    {enrollment && <NextWorkout enrollment={enrollment} nextDay={nextDay} workoutId={local.workoutId} nav={nav} />}
     {picking
       ? <EnrollForm entry={picking} replaces={enrollment && enrollment.artifactId !== picking.artifactId ? enrollment.title : null} onDone={() => setPicking(null)} />
       : <Section title={t('Programs')} footer={catalog && !catalog.length ? t('No programs are published yet.') : null}>
@@ -95,5 +130,6 @@ export default function ReppenPrograms() {
           accessory={enrollment?.artifactId === entry.artifactId ? 'check' : 'chevron'}
           onClick={enrollment?.artifactId === entry.artifactId ? undefined : () => setPicking(entry)} />)}
       </Section>}
+    <History items={history} catalog={catalog} />
   </div>
 }
