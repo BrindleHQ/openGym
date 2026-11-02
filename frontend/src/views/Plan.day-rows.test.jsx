@@ -13,7 +13,7 @@ import { dayAssignSheet, menuSheet } from '../sheets.jsx'
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => {
-  const state = { S: null, coach: false, nav: null }
+  const state = { S: null, coach: false, reppen: false, nav: null }
   state.snapshot = () => ({
     S: state.S,
     user: null,
@@ -33,6 +33,7 @@ vi.mock('../store/useStore.js', () => {
 vi.mock('react-router-dom', () => ({ useNavigate: () => mocks.nav }))
 vi.mock('../lib/mobile.js', () => ({ MOBILE: false, isAndroid: () => Promise.resolve(false), shareExport: vi.fn(), syncReminder: vi.fn() }))
 vi.mock('../lib/coach.js', () => ({ coachAvailable: () => mocks.coach }))
+vi.mock('../reppen/connection.js', () => ({ reppenAvailable: () => mocks.reppen }))
 vi.mock('../sheets.jsx', () => ({
   starterPlanSheet: vi.fn(), dayAssignSheet: vi.fn(), menuSheet: vi.fn(), confirmSheet: vi.fn(),
   planHasRoutines: s => (s.routines || []).some(r => r.ex.length), exportPlanFile: vi.fn(), printWholePlan: vi.fn(), importPlanFile: vi.fn(),
@@ -43,6 +44,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   localStorage.removeItem('gym_plan_view')
   mocks.coach = false
+  mocks.reppen = false
   mocks.nav = vi.fn()
   mocks.S = {
     unit: 'kg', workouts: [], exWeights: {}, week: { 1: ['r1'] }, dayPlan: {},
@@ -107,6 +109,17 @@ describe('Plan — the menu', () => {
     mount()
     expect(coachButton()).toBeUndefined()
     expect(openMenu().items.filter(Boolean).map(i => i.label)).not.toContain('Coach')
+  })
+
+  const programsButton = () => [...host.querySelectorAll('.hdr button')].find(b => b.textContent === 'Programs')
+
+  it('opens the Reppen programs from the header where Reppen is on, and has no such button elsewhere', () => {
+    mount()
+    expect(programsButton()).toBeUndefined()
+    mocks.reppen = true
+    mount()
+    act(() => programsButton().click())
+    expect(mocks.nav).toHaveBeenCalledWith('/reppen')
   })
 
   it('greys out share and print while there is nothing to share, and says why', () => {
