@@ -41,31 +41,43 @@ export function reppenClient({ base, token, fetch: doFetch = (...a) => globalThi
   async function once(method, path, body, bearer) {
     const ctl = new AbortController()
     const timer = setTimeout(() => ctl.abort(), method === 'GET' ? TIMEOUT_GET_MS : TIMEOUT_MS)
-    let r
     try {
-      r = await doFetch(base() + 'v1/' + path, {
+      const r = await doFetch(base() + 'v1/' + path, {
         method,
         headers: { Authorization: 'Bearer ' + bearer, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
         body: body !== undefined ? JSON.stringify(body) : undefined,
         signal: ctl.signal,
         credentials: 'omit',   // Reppen takes the Bearer only, never this origin's cookies
       })
-    } catch {
+      let data = null
+      try { data = await r.json() } catch {
+        if (ctl.signal.aborted) throw new ReppenError(0, null, 'Reppen could not be reached')
+        // A non-JSON response is judged below; an aborted body is a connection failure.
+      }
+      if (!r.ok) throw new ReppenError(r.status, data && typeof data === 'object' ? data : null)
+      if (!data || typeof data !== 'object') throw new ReppenError(r.status, null, 'Reppen answered with something other than JSON')
+      return data
+    } catch (e) {
+      if (e instanceof ReppenError) throw e
       throw new ReppenError(0, null, 'Reppen could not be reached')
     } finally { clearTimeout(timer) }
-    let data = null
-    try { data = await r.json() } catch { /* not JSON: someone else's answer, judged below */ }
-    if (!r.ok) throw new ReppenError(r.status, data && typeof data === 'object' ? data : null)
-    if (!data || typeof data !== 'object') throw new ReppenError(r.status, null, 'Reppen answered with something other than JSON')
-    return data
   }
 
+  async function getToken(options) {
+    try { return await token(options) }
+    catch (e) {
+      if (e instanceof TypeError || ['AbortError', 'TimeoutError'].includes(e?.name) || e?.code === 'timeout') throw new ReppenError(0, null, 'Reppen could not be reached')
+      if ([502, 503, 504].includes(e?.status) && !e.data?.error) throw new ReppenError(0, null, 'Reppen could not be reached')
+      if (e?.status) throw new ReppenError(e.status, e.data)
+      throw e
+    }
+  }
   // A token refused (expired early, a key rotated) is replaced once; a second 401 is the answer.
   async function call(method, path, body) {
-    try { return await once(method, path, body, await token()) }
+    try { return await once(method, path, body, await getToken()) }
     catch (e) {
       if (!(e instanceof ReppenError) || e.status !== 401) throw e
-      return once(method, path, body, await token({ fresh: true }))
+      return once(method, path, body, await getToken({ fresh: true }))
     }
   }
 

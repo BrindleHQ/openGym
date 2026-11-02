@@ -19,6 +19,33 @@ function setup(answers) {
 }
 
 describe('Reppen client', () => {
+  it('classifies token-mint connection failures as offline without hiding authentication refusal', async () => {
+    const client = reppenClient({ base: () => '/reppen/', token: async () => { throw new TypeError('Failed to fetch') } })
+    await expect(client.history()).rejects.toMatchObject({ status: 0, code: 'offline' })
+    const refused = reppenClient({ base: () => '/reppen/', token: async () => { throw Object.assign(new Error('signed out'), { status: 401 }) } })
+    await expect(refused.history()).rejects.toMatchObject({ status: 401 })
+  })
+  it.each([['GET', 20000], ['POST', 60000]])('keeps the %s deadline active while the response body is stalled', async (method, timeout) => {
+    vi.useFakeTimers()
+    try {
+      let signal
+      const client = reppenClient({ base: () => '/reppen/', token: async () => 't', fetch: async (_, init) => {
+        signal = init.signal
+        return { ok: true, status: 200, json: () => new Promise((_, reject) => {
+          signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true })
+        }) }
+      } })
+      let result
+      const pending = (method === 'GET' ? client.history() : client.finish('w', 1)).catch(e => { result = e })
+      await vi.advanceTimersByTimeAsync(0)
+      await vi.advanceTimersByTimeAsync(timeout - 1)
+      expect(result).toBeUndefined()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(signal.aborted).toBe(true)
+      await pending
+      expect(isOffline(result)).toBe(true)
+    } finally { vi.useRealTimers() }
+  })
   it('sends a Bearer and no cookies, on the same origin under /reppen/v1', async () => {
     const { client, calls } = setup([json(200, { workoutId: 'w 1', revision: 0 })])
     expect(await client.workout('w 1')).toEqual({ workoutId: 'w 1', revision: 0 })
