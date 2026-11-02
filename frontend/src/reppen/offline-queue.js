@@ -106,11 +106,22 @@ export function withOfflineQueue(store, { client, owner, storage, today, newId, 
       if (saved && (saved.version !== 1 || saved.owner !== account || !saved.data || !Array.isArray(saved.data.outbox) || !Array.isArray(saved.data.offlineJournal))) throw Error('Invalid offline journal')
     } catch { unreadable = true; persistError = fault('offlineStorage', 'Saved offline work could not be read. Keep this device open and recover it before continuing.'); saved = null }
     base.hydrate()
-    // Enrollment requests are verified in the base journal before HTTP. A failed
-    // snapshot write must not replace that retained request with an older copy.
-    const pendingEnrollment = store.getState().local.pendingEnrollment
+    const baseLocal = store.getState().local
     store.setState(empty)
-    if (saved) store.setState({ ...saved.data, local: { ...saved.data.local, pendingEnrollment } })
+    if (saved) {
+      const local = { ...saved.data.local }
+      // Either journal can retain the acknowledgment when the other's write fails.
+      // Match it to the pending ID; never roll back an offline-advanced nextDay.
+      if (baseLocal.enrollment?.enrollmentId && baseLocal.enrollment.enrollmentId === local.pendingEnrollment?.enrollmentId) {
+        local.enrollment = baseLocal.enrollment
+        local.nextDay = baseLocal.nextDay
+      }
+      // Pending requests are verified in the base journal before HTTP. Keep its
+      // exact request unless the snapshot already records that enrollment's ACK.
+      if (Object.hasOwn(baseLocal, 'pendingEnrollment')) local.pendingEnrollment = baseLocal.pendingEnrollment
+      if (local.pendingEnrollment?.enrollmentId && local.pendingEnrollment.enrollmentId === local.enrollment?.enrollmentId) local.pendingEnrollment = null
+      store.setState({ ...saved.data, local })
+    }
     base._rememberPending(store.getState().outbox, store.getState().workout?.revision || 0)
     loading = false
     const generation = epoch

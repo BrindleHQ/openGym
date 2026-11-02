@@ -16,6 +16,35 @@ function world() {
   return { client, device, midnight: () => { day = '2026-11-03' } }
 }
 describe('Dorito required setup', () => {
+  it.each(['base', 'snapshot'])('recovers an acknowledged replacement enrollment when the %s journal fails', async failed => {
+    const client = fakeClient(), kept = new Map()
+    let previousId, quota = false
+    const storage = { getItem: k => kept.get(k) ?? null, setItem(k, v) {
+      const snapshot = k.startsWith('reppen.offline.')
+      const local = snapshot ? JSON.parse(v).data.local : JSON.parse(v)
+      if (quota && snapshot === (failed === 'snapshot') && local.pendingEnrollment === null
+        && local.enrollment?.enrollmentId !== previousId) throw Error('acknowledgment quota')
+      kept.set(k, v)
+    } }
+    const device = () => {
+      const s = createReppenStore({ client, storage, owner: () => 'one', today: () => '2026-11-02' })
+      s.getState().hydrate(); return s
+    }
+    let s = device()
+    await s.getState().enroll({ ...entry, title: 'Previous', defaultDay: 'E' }, {}, filled(), true)
+    previousId = s.getState().local.enrollment.enrollmentId
+    quota = true
+    expect(await s.getState().enroll(entry, {}, filled(), true)).toBe(true)
+    const acknowledged = structuredClone(s.getState().local)
+    expect(acknowledged.enrollment.enrollmentId).not.toBe(previousId)
+    s.getState()._disposeOffline(); quota = false; s = device()
+    expect(s.getState().local.enrollment).toEqual(acknowledged.enrollment)
+    expect(s.getState().local.nextDay).toBe('A')
+    expect(s.getState().local.pendingEnrollment).toBeNull()
+    await s.getState().loadEnrollment()
+    expect(client.enrollment).toHaveBeenLastCalledWith(acknowledged.enrollment.enrollmentId)
+    expect(client.enroll).toHaveBeenCalledTimes(2)
+  })
   it('retains the same enrollment across snapshot quota failure, reload and a lost response', async () => {
     const client = fakeClient(), kept = new Map()
     let quota = true, day = '2026-11-02'
