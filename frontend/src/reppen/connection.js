@@ -23,5 +23,10 @@ export const reppen = reppenClient({
 })
 
 export const reppenStore = createReppenStore({ client: reppen, owner: () => useStore.getState().user?.id, today: todayISO })
+// Observe sign-out even when no Reppen screen is mounted; signing back into the same account
+// must not revive an abandoned operation or leave its busy state behind.
+useStore.subscribe((state, previous) => {
+  if (state.user?.id !== previous.user?.id) reppenStore.getState().hydrate()
+})
 /** The Reppen store in a component, the way useStore is used everywhere else. */
 export const useReppen = selector => useZustand(reppenStore, selector)

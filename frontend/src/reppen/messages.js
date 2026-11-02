@@ -13,6 +13,7 @@ export function errorText(e) {
     case 'offline': return t('Reppen could not be reached. Check your connection and try again.')
     case 'unauthenticated': case 'http401': return t('Reppen did not accept your sign-in. Sign in again and retry.')
     case 'enrollmentNotFound': return t('Reppen no longer has this program enrollment.')
+    case 'enrollmentPending': return t('Retry the pending program enrollment before choosing another program.')
     case 'workoutNotFound': return t('Reppen no longer has this workout.')
     case 'programNotFound': case 'catalogArtifactNotFound': return t('This program is no longer available.')
     case 'unsupportedExecution': return t('This program cannot run here yet.')

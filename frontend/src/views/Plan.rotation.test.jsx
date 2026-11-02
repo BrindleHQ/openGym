@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => {
 vi.mock('../store/useStore.js', () => {
   const useStore = selector => selector ? selector(mocks.snapshot()) : mocks.snapshot()
   useStore.getState = mocks.snapshot
+  useStore.subscribe = vi.fn(() => () => {})
   return { useStore }
 })
 vi.mock('react-router-dom', () => ({ useNavigate: () => mocks.nav }))

@@ -49,13 +49,15 @@ function readLocal(storage, owner) {
  *   storage?: Storage, today: () => string }} deps
  */
 export function createReppenStore({ client: direct, owner, storage = globalThis.localStorage, today }) {
+  let generation = 0
   // An answer that arrives after the account changed belongs to nobody here: its promise never
   // settles, so nothing after it runs, and one account's enrollment or workout cannot be written
   // into another's state or storage. hydrate() resets what such an action left in flight.
   const client = new Proxy(direct, {
     get: (target, name) => (...args) => {
       const who = owner()
-      const mine = () => owner() === who
+      const started = generation
+      const mine = () => owner() === who && generation === started
       return target[name](...args).then(r => (mine() ? r : new Promise(() => {})), e => (mine() ? Promise.reject(e) : new Promise(() => {})))
     },
   })
@@ -72,13 +74,16 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       catalog: null,          // catalog entries, once loaded
       enrollmentView: null,   // GET /v1/enrollments/{id}
       error: null,            // the last failure, a ReppenError
+      catalogError: null,
+      enrollmentError: null,
       busy: false,
 
       /** Loads this account's pointers; call on every screen mount (the account may have changed). */
       hydrate() {
         const who = owner()
         if (get().localOwner === who) return
-        set({ local: who ? readLocal(storage, who) : {}, localOwner: who, enrollmentView: null, error: null, busy: false })
+        generation++
+        set({ local: who ? readLocal(storage, who) : {}, localOwner: who, enrollmentView: null, error: null, catalogError: null, enrollmentError: null, busy: false })
       },
 
       async loadCatalog() {
@@ -90,8 +95,8 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
             items.push(...(page.items || []))
             cursor = page.nextCursor
           } while (cursor)
-          set({ catalog: items, error: null })
-        } catch (e) { set({ error: e }) }
+          set({ catalog: items, catalogError: null })
+        } catch (e) { set({ catalogError: e }) }
       },
 
       async loadEnrollment() {
@@ -99,30 +104,52 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         if (!id) return null
         try {
           const view = await client.enrollment(id)
-          set({ enrollmentView: view, error: null })
+          if (get().local.enrollment?.enrollmentId !== id) return null
+          set({ enrollmentView: view, enrollmentError: null })
           return view
-        } catch (e) { set({ error: e }); return null }
+        } catch (e) {
+          if (get().local.enrollment?.enrollmentId !== id) return null
+          if (['enrollmentNotFound', 'programNotFound'].includes(e.code)) {
+            save({ enrollment: null, nextDay: null })
+            set({ enrollmentView: null })
+          }
+          set({ enrollmentError: e }); return null
+        }
       },
 
       /** Enrolls in a catalog program with the readings it asks for ({ [reading index]: kg }). */
       async enroll(entry, kgByReading) {
         if (get().busy) return false
+        const saved = get().local.pendingEnrollment
+        if (saved && saved.artifactId !== entry.artifactId) {
+          set({ error: { code: 'enrollmentPending' } })
+          return false
+        }
         const day = today()
         const readings = massReadings(entry).map((r, i) => kgByReading[i] > 0 ? massReading(r, kgByReading[i], day) : null).filter(Boolean)
-        // Kept before the request: a retry after a lost answer repeats it with the same id.
-        const pending = get().local.pendingEnrollment?.artifactId === entry.artifactId ? get().local.pendingEnrollment : { enrollmentId: newId(), artifactId: entry.artifactId }
+        // Keep the full request: retries after edits, midnight, or reload must send identical bytes.
+        const pending = saved || {
+          enrollmentId: newId(), artifactId: entry.artifactId,
+          body: { artifactId: entry.artifactId, startOn: day, params: emptyParams(entry), readings },
+          kgByReading: { ...kgByReading },
+        }
         save({ pendingEnrollment: pending })
         set({ busy: true, error: null })
         try {
-          const view = await client.enroll(pending.enrollmentId, { artifactId: entry.artifactId, startOn: day, params: emptyParams(entry), readings })
+          const view = await client.enroll(pending.enrollmentId, pending.body)
           save({
             pendingEnrollment: null,
             enrollment: { enrollmentId: pending.enrollmentId, artifactId: entry.artifactId, catalogId: entry.catalogId, title: entry.title, days: entry.days || [], defaultDay: entry.defaultDay ?? null },
             nextDay: entry.defaultDay ?? entry.days?.[0] ?? null,
           })
-          set({ enrollmentView: view })
+          set({ enrollmentView: view, enrollmentError: null })
           return true
-        } catch (e) { set({ error: e }); return false }
+        } catch (e) {
+          // These are definitive creation refusals. Reppen returns an existing enrollment
+          // before validating creation inputs, so they cannot hide a committed enrollment.
+          if ([400, 404, 422].includes(e.status)) save({ pendingEnrollment: null })
+          set({ error: e }); return false
+        }
         finally { set({ busy: false }) }
       },
 

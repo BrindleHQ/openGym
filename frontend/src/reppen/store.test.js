@@ -61,6 +61,84 @@ describe('Reppen store: programs', () => {
     expect(store.getState().local.enrollment.title).toBe('GZCLP T1')
   })
 
+  it.each(['catalog', 'enrollment'])('preserves a failed %s load when the other load succeeds later', async failed => {
+    let succeed
+    const error = new ReppenError(0, null)
+    const client = fakeClient({
+      catalog: vi.fn(() => failed === 'catalog' ? Promise.reject(error) : new Promise(r => { succeed = () => r({ items: [], nextCursor: null }) })),
+      enrollment: vi.fn(() => failed === 'enrollment' ? Promise.reject(error) : new Promise(r => { succeed = () => r({ revision: 0 }) })),
+    })
+    const { store } = setup(client)
+    store.setState({ local: { enrollment: { enrollmentId: 'e' } } })
+    const loads = [store.getState().loadCatalog(), store.getState().loadEnrollment()]
+    await Promise.resolve()
+    succeed()
+    await Promise.all(loads)
+    expect(store.getState()[failed + 'Error']).toBe(error)
+  })
+
+  it.each(['enrollmentNotFound', 'programNotFound'])('clears a stale enrollment on %s, allowing re-enrollment', async error => {
+    const { store, storage } = setup(fakeClient({ enrollment: vi.fn().mockRejectedValue(new ReppenError(404, { error })) }))
+    store.setState({ local: { enrollment: { enrollmentId: 'gone', artifactId: GZCLP.artifactId }, nextDay: 'A1' } })
+    await store.getState().loadEnrollment()
+    expect(JSON.parse(storage.getItem('reppen.v1.u1'))).toMatchObject({ enrollment: null, nextDay: null })
+    expect(await store.getState().enroll(GZCLP, { 0: 1, 1: 1 })).toBe(true)
+  })
+
+  it('retains the saved enrollment after a temporary transport failure', async () => {
+    const { store } = setup(fakeClient({ enrollment: vi.fn().mockRejectedValue(new ReppenError(0, null)) }))
+    const enrollment = { enrollmentId: 'e', artifactId: GZCLP.artifactId }
+    store.setState({ local: { enrollment, nextDay: 'A1' } })
+    await store.getState().loadEnrollment()
+    expect(store.getState().local.enrollment).toEqual(enrollment)
+  })
+
+  it.each(['success', 'missing'])('ignores an old enrollment GET %s after replacing the program', async result => {
+    let settle
+    const { store, storage } = setup(fakeClient({ enrollment: vi.fn(() => new Promise((resolve, reject) => {
+      settle = () => result === 'success' ? resolve({ enrollmentId: 'old', revision: 0 }) : reject(new ReppenError(404, { error: 'enrollmentNotFound' }))
+    })) }))
+    store.setState({ local: { enrollment: { enrollmentId: 'old' }, nextDay: 'B2' } })
+    const loading = store.getState().loadEnrollment()
+    await store.getState().enroll(GZCLP, { 0: 140, 1: 100 })
+    const local = structuredClone(store.getState().local)
+    const view = structuredClone(store.getState().enrollmentView)
+    settle()
+    await loading
+    expect(store.getState().local).toEqual(local)
+    expect(JSON.parse(storage.getItem('reppen.v1.u1'))).toEqual(local)
+    expect(store.getState().enrollmentView).toEqual(view)
+    expect(store.getState().enrollmentError).toBe(null)
+  })
+
+  it('retries the complete saved request after reload, midnight, and edited readings', async () => {
+    const { store, storage, client } = setup(fakeClient({ enroll: vi.fn().mockRejectedValue(new ReppenError(0, null)) }))
+    await store.getState().enroll(GZCLP, { 0: 140, 1: 100 })
+    const retryClient = fakeClient()
+    const reloaded = createReppenStore({ client: retryClient, owner: () => 'u1', storage, today: () => '2026-11-02' })
+    reloaded.getState().hydrate()
+    expect(await reloaded.getState().enroll(GZCLP, { 0: 200, 1: 150 })).toBe(true)
+    expect(retryClient.enroll.mock.calls[0]).toEqual(client.enroll.mock.calls[0])
+  })
+
+  it('requires resolving the pending enrollment before choosing another program', async () => {
+    const { store, client } = setup(fakeClient({ enroll: vi.fn().mockRejectedValue(new ReppenError(0, null)) }))
+    await store.getState().enroll(GZCLP, { 0: 140, 1: 100 })
+    const pending = store.getState().local.pendingEnrollment
+    expect(await store.getState().enroll({ ...GZCLP, artifactId: 'other' }, { 0: 1, 1: 1 })).toBe(false)
+    expect(client.enroll).toHaveBeenCalledTimes(1)
+    expect(store.getState().local.pendingEnrollment).toEqual(pending)
+  })
+
+  it('allows correcting inputs after a definitive creation refusal', async () => {
+    const { store, client } = setup(fakeClient({ enroll: vi.fn().mockRejectedValueOnce(new ReppenError(422, { error: 'refused' })).mockImplementation(async id => ({ enrollmentId: id })) }))
+    expect(await store.getState().enroll(GZCLP, { 0: 1, 1: 1 })).toBe(false)
+    expect(store.getState().local.pendingEnrollment).toBe(null)
+    expect(await store.getState().enroll(GZCLP, { 0: 140, 1: 100 })).toBe(true)
+    expect(client.enroll.mock.calls[1][0]).not.toBe(client.enroll.mock.calls[0][0])
+    expect(client.enroll.mock.calls[1][1].readings[0].value.n).toBe(140)
+  })
+
   it('drops an answer that arrives after the account changed', async () => {
     let answer
     const enroll = vi.fn(() => new Promise(r => { answer = r }))

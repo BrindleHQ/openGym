@@ -25,23 +25,26 @@ function cannotEnroll(entry) {
 
 function EnrollForm({ entry, replaces, onDone }) {
   const busy = useReppen(s => s.busy)
+  const pending = useReppen(s => s.local.pendingEnrollment)
+  const retry = pending?.artifactId === entry.artifactId
   const readings = massReadings(entry)
   const [kg, setKg] = useState({})
   const blocked = cannotEnroll(entry)
-  const missing = readings.some((r, i) => r.required && !(kg[i] > 0))
+  const missing = !retry && readings.some((r, i) => r.required && !(kg[i] > 0))
   const submit = async () => { if (await actions().enroll(entry, kg)) onDone() }
   return <div className="card reppen-enroll" data-catalog-id={entry.catalogId}>
     <h2>{entry.title}</h2>
     {readings.length > 0 && <p className="sect-f">{t('Enter your current numbers. The program sets your first weights from them.')}</p>}
+    {retry && <p className="sect-f">{t('Retrying confirms the original enrollment request and readings.')}</p>}
     {readings.map((r, i) => <label key={i} className="row between reppen-reading">
       <span><span>{readingLabel(r)}</span> <span className="sub">{r.key}</span></span>
-      <span className="row"><NumberField value={kg[i] ?? null} nullable aria-label={readingLabel(r) + ' ' + (r.key || '')}
+      <span className="row"><NumberField value={(retry ? pending.kgByReading?.[i] : kg[i]) ?? null} disabled={retry} nullable aria-label={readingLabel(r) + ' ' + (r.key || '')}
         onChange={v => setKg(prev => ({ ...prev, [i]: v }))} /> kg</span>
     </label>)}
     {blocked && <p className="sect-f" role="alert">{blocked}</p>}
     {replaces && <p className="sect-f">{t('This replaces {0} in this app.', replaces)}</p>}
     <div className="row" style={{ gap: 8, marginTop: 10 }}>
-      <Button variant="filled" disabled={!!blocked || missing || busy} onClick={submit}>{t('Enroll')}</Button>
+      <Button variant="filled" disabled={!!blocked || missing || busy} onClick={submit}>{t(retry ? 'Retry' : 'Enroll')}</Button>
       <Button onClick={onDone}>{t('Cancel')}</Button>
     </div>
   </div>
@@ -64,6 +67,8 @@ export default function ReppenPrograms() {
   const local = useReppen(s => s.local)
   const catalog = useReppen(s => s.catalog)
   const error = useReppen(s => s.error)
+  const catalogError = useReppen(s => s.catalogError)
+  const enrollmentError = useReppen(s => s.enrollmentError)
   const [picking, setPicking] = useState(null)
   const ok = reppenAvailable(config, user)
 
@@ -84,12 +89,12 @@ export default function ReppenPrograms() {
       <button className="iconbtn" data-back="/plan" onClick={() => nav('/plan')} aria-label={t('Plan')}><Icon name="chevronLeft" /></button>
       <div style={{ flex: 1, marginInlineStart: 12 }}><h1>{t('Programs')}</h1><div className="sub">Reppen</div></div>
     </div>
-    {error && <div className="card reppen-error" role="alert">{errorText(error)}</div>}
+    {[error, catalogError, enrollmentError].filter(Boolean).map((e, i) => <div key={i} className="card reppen-error" role="alert">{errorText(e)}</div>)}
     {enrollment && <NextWorkout enrollment={enrollment} nextDay={nextDay} />}
     {picking
       ? <EnrollForm entry={picking} replaces={enrollment && enrollment.artifactId !== picking.artifactId ? enrollment.title : null} onDone={() => setPicking(null)} />
       : <Section title={t('Programs')} footer={catalog && !catalog.length ? t('No programs are published yet.') : null}>
-        {!catalog && !error && <Row title={t('Loading…')} />}
+        {!catalog && !catalogError && <Row title={t('Loading…')} />}
         {(catalog || []).map(entry => <Row key={entry.artifactId} icon="list" title={entry.title}
           subtitle={t('{0} days', (entry.days || []).length)}
           accessory={enrollment?.artifactId === entry.artifactId ? 'check' : 'chevron'}

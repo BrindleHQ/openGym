@@ -34,7 +34,7 @@ const type = (input, value) => {
 beforeEach(() => {
   localStorage.clear()
   Object.assign(client, fakeClient())
-  reppenStore.setState({ local: {}, localOwner: null, catalog: null, enrollmentView: null, error: null, busy: false })
+  reppenStore.setState({ local: {}, localOwner: null, catalog: null, enrollmentView: null, error: null, catalogError: null, enrollmentError: null, busy: false })
   useStore.setState({ config: { reppen: true }, user: { id: 'u1', name: 'Ana' } })
 })
 afterEach(() => { act(() => { mounted.splice(0).forEach(r => r.unmount()) }); document.body.innerHTML = '' })
@@ -95,5 +95,39 @@ describe('Reppen programs screen', () => {
     await act(async () => [...host.querySelectorAll('button.lrow')][0].click())
     expect(host.querySelector('.reppen-enroll [role=alert]').textContent).toContain('cannot run here yet')
     expect(button(host, 'Enroll').disabled).toBe(true)
+  })
+
+  it('invalidates a pending enrollment on sign-out and permits the same account to retry', async () => {
+    let answer
+    client.enroll = vi.fn(() => new Promise(r => { answer = r }))
+    await render()
+    let pending
+    await act(async () => { pending = reppenStore.getState().enroll(GZCLP, { 0: 140, 1: 100 }) })
+    expect(reppenStore.getState().busy).toBe(true)
+    await act(async () => useStore.setState({ user: null }))
+    expect(reppenStore.getState().busy).toBe(false)
+    await act(async () => useStore.setState({ user: { id: 'u1' } }))
+    answer({ enrollmentId: 'old' })
+    await settle()
+    expect(reppenStore.getState().local.enrollment).toBeUndefined()
+    expect(reppenStore.getState().busy).toBe(false)
+    client.enroll = vi.fn(async id => ({ enrollmentId: id }))
+    await act(async () => expect(await reppenStore.getState().enroll(GZCLP, {})).toBe(true))
+    void pending
+  })
+
+  it('shows the saved readings and retries them after an ambiguous enrollment failure', async () => {
+    const { ReppenError } = await import('./client.js')
+    client.enroll = vi.fn().mockRejectedValueOnce(new ReppenError(0, null)).mockImplementation(async id => ({ enrollmentId: id }))
+    const host = await render()
+    await act(async () => [...host.querySelectorAll('button.lrow')][0].click())
+    const inputs = host.querySelectorAll('.reppen-enroll input')
+    await act(async () => { type(inputs[0], '140'); type(inputs[1], '100') })
+    await act(async () => button(host, 'Enroll').click())
+    expect(host.textContent).toContain('Retrying confirms the original enrollment request and readings.')
+    expect([...host.querySelectorAll('.reppen-enroll input')].map(i => [i.value, i.disabled])).toEqual([['140', true], ['100', true]])
+    await act(async () => button(host, 'Retry').click())
+    expect(client.enroll.mock.calls[1]).toEqual(client.enroll.mock.calls[0])
+    expect(host.querySelector('.reppen-enroll')).toBe(null)
   })
 })
