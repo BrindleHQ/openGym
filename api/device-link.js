@@ -54,7 +54,7 @@ export function createDeviceLink(db, userId, now = Date.now(), ttlMs = DEVICE_LI
 // The live link a code belongs to, or null — a wrong code, a used one and an expired one all look
 // the same from outside. Finding a link does not use it up; burnDeviceLink does.
 export function findDeviceLink(db, code, now = Date.now()) {
-  prune(db, now);
+  // Pruning happens on write (createDeviceLink), so a lookup stays a pure read.
   if (clean(code).length !== LENGTH) return null;
   const h = Buffer.from(hashLinkCode(code), 'hex');
   return db.deviceLinks.find(l => {
