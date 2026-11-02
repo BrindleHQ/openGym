@@ -2632,4 +2632,7 @@ export default {
   'Your program': 'Ваша программа',
   'calculated': 'расчётное',
   'Your Reppen program saved this workout. It cannot be changed here.': 'Эту тренировку сохранила ваша программа Reppen. Здесь её нельзя изменить.',
+  'Another device saved this set first. Yours was: {0}': 'Другое устройство сохранило этот подход первым. Ваш был: {0}',
+  'Save mine': 'Сохранить мой',
+  'cleared': 'очищен',
 }
