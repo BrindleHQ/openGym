@@ -123,7 +123,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       const previous = get().workout?.workoutId
       const switching = previous && previous !== view.workoutId
       set({ workout: view, ...(switching ? {
-        outbox: [], rejected: [...get().rejected, ...get().outbox.map(event => ({ workoutId: previous, event, code: 'workoutChanged' }))],
+        outbox: [], rejected: [...get().rejected.map(r => ({ ...r, workoutId: r.workoutId || previous, code: 'workoutChanged' })), ...get().outbox.map(event => ({ workoutId: previous, event, code: 'workoutChanged' }))],
       } : {}) })
     }
     function completedWorkout(id, error, events = []) {

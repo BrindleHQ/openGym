@@ -415,6 +415,22 @@ describe('Reppen store: two devices on one workout', () => {
     expect(laptop.getState().held.active.workoutId).toBe(tablet.getState().workout.workoutId)
   })
 
+  it('leaves one workout\'s drafts behind when continuing the workout another device made active', async () => {
+    const { w, phone, laptop } = await twoDevices()
+    await phone.getState().logSet('squat', 'work', 0, { load: 100, reps: 5 })
+    await laptop.getState().logSet('squat', 'work', 0, { load: 105, reps: 5 })
+    expect(laptop.getState().rejected).toMatchObject([{ code: 'setTaken' }])
+    const tablet = w.device()
+    tablet.setState({ local: { ...phone.getState().local, workoutId: null } })
+    await tablet.getState().start('B1')
+    await tablet.getState().continueHeld()
+    await laptop.getState().catchUp()
+    await laptop.getState().continueActive()
+    expect(laptop.getState().workout.workoutId).toBe(tablet.getState().workout.workoutId)
+    expect(laptop.getState().rejected).toEqual([])
+    expect(laptop.getState().outbox).toEqual([])
+  })
+
   it('moves the other device to the finished state without finishing again', async () => {
     const { w, phone, laptop, recordFinished } = await twoDevices()
     await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
