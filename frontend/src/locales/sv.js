@@ -2636,6 +2636,8 @@ export default {
   'The icon could not be changed.': 'Ikonen gick inte att byta.',
   'Try the Halloween app icon': 'Testa Halloween-appikonen',
   // --- Reppen programs and workouts ---
+  'Retrying confirms the original enrollment request and readings.': 'Ett nytt försök bekräftar den ursprungliga anmälan och de angivna värdena.',
+  'Retry the pending program enrollment before choosing another program.': 'Försök med den väntande anmälan igen innan du väljer ett annat program.',
   'AMRAP': 'AMRAP',
   'Another workout is already in progress: {0}, {1} entries logged.': 'Ett annat pass pågår redan: {0}, {1} poster loggade.',
   'Answer the open questions before finishing.': 'Svara på de öppna frågorna innan du avslutar.',

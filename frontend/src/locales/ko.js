@@ -2589,6 +2589,8 @@ export default {
   'The icon could not be changed.': '아이콘을 바꾸지 못했어요.',
   'Try the Halloween app icon': '핼러윈 앱 아이콘 써 보기',
   // --- Reppen programs and workouts ---
+  'Retrying confirms the original enrollment request and readings.': '다시 시도하면 처음 등록 요청과 입력한 측정값을 확인합니다.',
+  'Retry the pending program enrollment before choosing another program.': '다른 프로그램을 선택하기 전에 대기 중인 프로그램 등록을 다시 시도하세요.',
   'AMRAP': 'AMRAP',
   'Another workout is already in progress: {0}, {1} entries logged.': '이미 다른 운동이 진행 중입니다: {0}, 기록 {1}개.',
   'Answer the open questions before finishing.': '마치기 전에 남은 질문에 답하세요.',

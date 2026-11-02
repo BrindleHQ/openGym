@@ -2589,6 +2589,8 @@ export default {
   'The icon could not be changed.': 'आइकन बदला नहीं जा सका।',
   'Try the Halloween app icon': 'हैलोवीन ऐप आइकन आज़माएँ',
   // --- Reppen programs and workouts ---
+  'Retrying confirms the original enrollment request and readings.': 'दोबारा कोशिश करने से मूल नामांकन अनुरोध और दर्ज किए गए मापों की पुष्टि होती है।',
+  'Retry the pending program enrollment before choosing another program.': 'दूसरा प्रोग्राम चुनने से पहले लंबित प्रोग्राम नामांकन के लिए दोबारा कोशिश करें।',
   'AMRAP': 'AMRAP',
   'Another workout is already in progress: {0}, {1} entries logged.': 'एक और वर्कआउट पहले से चल रहा है: {0}, {1} एंट्री दर्ज।',
   'Answer the open questions before finishing.': 'खत्म करने से पहले खुले सवालों के जवाब दें।',

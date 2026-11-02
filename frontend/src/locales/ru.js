@@ -2593,6 +2593,8 @@ export default {
   'The icon could not be changed.': 'Не удалось сменить значок.',
   'Try the Halloween app icon': 'Попробуй хеллоуинский значок приложения',
   // --- Reppen programs and workouts ---
+  'Retrying confirms the original enrollment request and readings.': 'Повторная попытка подтверждает первоначальную заявку и введённые значения.',
+  'Retry the pending program enrollment before choosing another program.': 'Повторите ожидающую подтверждения заявку на программу, прежде чем выбирать другую программу.',
   'AMRAP': 'AMRAP',
   'Another workout is already in progress: {0}, {1} entries logged.': 'Уже идёт другая тренировка: {0}, записей: {1}.',
   'Answer the open questions before finishing.': 'Ответьте на открытые вопросы перед завершением.',

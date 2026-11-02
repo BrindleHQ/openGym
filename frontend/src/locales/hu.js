@@ -2592,6 +2592,8 @@ export default {
   'The icon could not be changed.': 'Nem sikerült megváltoztatni az ikont.',
   'Try the Halloween app icon': 'Próbáld ki a halloweeni alkalmazásikont',
   // --- Reppen programs and workouts ---
+  'Retrying confirms the original enrollment request and readings.': 'Az újrapróbálás az eredeti jelentkezési kérelmet és a megadott értékeket erősíti meg.',
+  'Retry the pending program enrollment before choosing another program.': 'Próbáld újra a függőben lévő jelentkezést, mielőtt másik programot választasz.',
   'AMRAP': 'AMRAP',
   'Another workout is already in progress: {0}, {1} entries logged.': 'Már folyamatban van egy másik edzés: {0}, {1} bejegyzés rögzítve.',
   'Answer the open questions before finishing.': 'Válaszolj a nyitott kérdésekre befejezés előtt.',

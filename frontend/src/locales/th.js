@@ -2600,6 +2600,8 @@ export default {
   'The icon could not be changed.': 'เปลี่ยนไอคอนไม่ได้',
   'Try the Halloween app icon': 'ลองไอคอนแอปฮาโลวีน',
   // --- Reppen programs and workouts ---
+  'Retrying confirms the original enrollment request and readings.': 'การลองอีกครั้งจะยืนยันคำขอสมัครและค่าที่กรอกไว้เดิม',
+  'Retry the pending program enrollment before choosing another program.': 'ลองสมัครโปรแกรมที่ค้างอยู่อีกครั้งก่อนเลือกโปรแกรมอื่น',
   'AMRAP': 'AMRAP',
   'Another workout is already in progress: {0}, {1} entries logged.': 'มีการฝึกอื่นกำลังดำเนินอยู่: {0} บันทึกแล้ว {1} รายการ',
   'Answer the open questions before finishing.': 'ตอบคำถามที่ค้างอยู่ก่อนจบ',

@@ -2589,6 +2589,8 @@ export default {
   'The icon could not be changed.': 'No se pudo cambiar el icono.',
   'Try the Halloween app icon': 'Prueba el icono de Halloween',
   // --- Reppen programs and workouts ---
+  'Retrying confirms the original enrollment request and readings.': 'Al reintentar se confirman la solicitud de inscripción y los valores originales.',
+  'Retry the pending program enrollment before choosing another program.': 'Reintenta la inscripción pendiente antes de elegir otro programa.',
   'AMRAP': 'AMRAP',
   'Another workout is already in progress: {0}, {1} entries logged.': 'Ya hay otro entreno en curso: {0}, {1} registros.',
   'Answer the open questions before finishing.': 'Responde las preguntas pendientes antes de terminar.',

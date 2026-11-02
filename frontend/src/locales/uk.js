@@ -2586,6 +2586,8 @@ export default {
   'The icon could not be changed.': 'Не вдалося змінити значок.',
   'Try the Halloween app icon': 'Спробуй гелловінський значок застосунку',
   // --- Reppen programs and workouts ---
+  'Retrying confirms the original enrollment request and readings.': 'Повторна спроба підтверджує початкову заявку та введені значення.',
+  'Retry the pending program enrollment before choosing another program.': 'Повторіть заявку на участь у програмі, що очікує підтвердження, перш ніж вибирати іншу програму.',
   'AMRAP': 'AMRAP',
   'Another workout is already in progress: {0}, {1} entries logged.': 'Уже триває інше тренування: {0}, записів: {1}.',
   'Answer the open questions before finishing.': 'Дайте відповідь на відкриті питання перед завершенням.',

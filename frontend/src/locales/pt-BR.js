@@ -1671,6 +1671,8 @@ export const PT_BR_OVERRIDES = {
   'Just for this phone. Some home screens take a moment to catch up.': 'Só para este celular. Algumas telas iniciais demoram um pouco para perceber.',
   'Try the Halloween app icon': 'Experimente o ícone de Halloween do app',
   // --- Reppen programs and workouts ---
+  'Retrying confirms the original enrollment request and readings.': 'Tentar novamente confirma o pedido de inscrição e os valores originais.',
+  'Retry the pending program enrollment before choosing another program.': 'Tente novamente a inscrição pendente antes de escolher outro programa.',
   'Another workout is already in progress: {0}, {1} entries logged.': 'Já tem outro treino em andamento: {0}, {1} registros.',
   'Answer the open questions before finishing.': 'Responda às perguntas em aberto antes de terminar.',
   'Day {0} is in your Reppen history.': 'O dia {0} está no seu histórico do Reppen.',

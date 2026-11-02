@@ -2668,6 +2668,8 @@ export default {
   'The icon could not be changed.': 'আইকন বদলানো গেল না।',
   'Try the Halloween app icon': 'হ্যালোইন অ্যাপ আইকন চেষ্টা করুন',
   // --- Reppen programs and workouts ---
+  'Retrying confirms the original enrollment request and readings.': 'আবার চেষ্টা করলে প্রথম নিবন্ধনের অনুরোধ ও পরিমাপগুলো নিশ্চিত করা হবে।',
+  'Retry the pending program enrollment before choosing another program.': 'অন্য প্রোগ্রাম বেছে নেওয়ার আগে অপেক্ষমাণ প্রোগ্রাম নিবন্ধনের জন্য আবার চেষ্টা করুন।',
   'AMRAP': 'AMRAP',
   'Another workout is already in progress: {0}, {1} entries logged.': 'আরেকটি ওয়ার্কআউট আগে থেকেই চলছে: {0}, {1}টি এন্ট্রি লেখা হয়েছে।',
   'Answer the open questions before finishing.': 'শেষ করার আগে খোলা প্রশ্নগুলোর উত্তর দিন।',

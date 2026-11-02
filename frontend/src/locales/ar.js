@@ -2644,6 +2644,8 @@ export default {
   'The icon could not be changed.': 'تعذّر تغيير الأيقونة.',
   'Try the Halloween app icon': 'جرّب أيقونة التطبيق الخاصة بالهالوين',
   // --- Reppen programs and workouts ---
+  'Retrying confirms the original enrollment request and readings.': 'إعادة المحاولة تؤكد طلب الانضمام والقياسات الأصلية.',
+  'Retry the pending program enrollment before choosing another program.': 'أعد محاولة طلب الانضمام المعلّق قبل اختيار برنامج آخر.',
   'AMRAP': 'AMRAP',
   'Another workout is already in progress: {0}, {1} entries logged.': 'هناك تمرين آخر قيد التقدم: {0}، وسُجّل {1} إدخال.',
   'Answer the open questions before finishing.': 'أجب عن الأسئلة المفتوحة قبل الإنهاء.',

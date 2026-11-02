@@ -2589,6 +2589,8 @@ export default {
   'The icon could not be changed.': 'Simge değiştirilemedi.',
   'Try the Halloween app icon': 'Cadılar Bayramı uygulama simgesini dene',
   // --- Reppen programs and workouts ---
+  'Retrying confirms the original enrollment request and readings.': 'Yeniden denemek, ilk kayıt isteğini ve girilen değerleri onaylar.',
+  'Retry the pending program enrollment before choosing another program.': 'Başka bir program seçmeden önce bekleyen program kaydını yeniden dene.',
   'AMRAP': 'AMRAP',
   'Another workout is already in progress: {0}, {1} entries logged.': 'Devam eden başka bir antrenman var: {0}, {1} kayıt.',
   'Answer the open questions before finishing.': 'Bitirmeden önce açık soruları yanıtla.',

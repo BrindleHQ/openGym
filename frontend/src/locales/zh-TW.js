@@ -2582,6 +2582,8 @@ export default {
   'The icon could not be changed.': '無法更換圖示。',
   'Try the Halloween app icon': '試試萬聖節 App 圖示',
   // --- Reppen programs and workouts ---
+  'Retrying confirms the original enrollment request and readings.': '重試將確認最初的報名請求和輸入的數值。',
+  'Retry the pending program enrollment before choosing another program.': '請先重試尚未完成的計畫報名，再選擇其他計畫。',
   'AMRAP': 'AMRAP',
   'Another workout is already in progress: {0}, {1} entries logged.': '已有另一場訓練正在進行：{0}，已記錄 {1} 筆。',
   'Answer the open questions before finishing.': '請先回答待答問題，再結束訓練。',
