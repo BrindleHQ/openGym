@@ -245,7 +245,7 @@ main.api-main .lead { color: var(--fg-2); max-width: 58ch; margin: 14px 0 0; fon
   <p class="api-facts">
     <span>OpenAPI 3.1.0</span>
     <span>openGym v1.4.3</span>
-    <span>75 endpoints</span>
+    <span>77 endpoints</span>
     <span>AGPL-3.0-or-later</span>
   </p>
 
@@ -587,6 +587,66 @@ main.api-main .lead { color: var(--fg-2); max-width: 58ch; margin: 14px 0 0; fon
   <div class="prow rrow">
     <span class="r-code s4">401</span>
     <span class="p-desc">No session, expired/revoked session, or a disabled account.<span class="r-sig"><code>{&quot;error&quot;:&quot;not signed in&quot;}</code></span></span>
+  </div>
+    </div>
+  </div>
+</details>
+
+<details class="ep" id="op-reppenJwks">
+  <summary>
+    <span class="m get">GET</span>
+    <span class="ep-path"><code>/api/reppen/jwks</code><span class="ep-chip public">public</span></span>
+    <span class="ep-chev" aria-hidden="true"></span>
+    <span class="ep-sum">Public keys for Reppen access tokens</span>
+  </summary>
+  <div class="ep-body">
+<p>The JWKS a Reppen service verifies this instance's access tokens against: Ed25519 keys (<code>kty: OKP</code>, <code>alg: EdDSA</code>, <code>use: sig</code>), each with its <code>kid</code>. A new key is listed before it signs anything; an old one stays until its last token has expired. Exists only while both <code>REPPEN_TOKEN_ISSUER</code> and <code>REPPEN_TOKEN_AUDIENCE</code> are set; otherwise <code>404</code>.</p>
+    <p class="ep-auth"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Public: no authentication required.</span></p>
+
+
+    <p class="ep-h">Responses</p>
+    <div class="ptab">
+  <div class="prow rrow">
+    <span class="r-code s2">200</span>
+    <span class="p-desc">The published keys.<span class="r-sig">{ keys: object[] }</span></span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s4">404</span>
+    <span class="p-desc">Reppen tokens are off on this instance.</span>
+  </div>
+    </div>
+  </div>
+</details>
+
+<details class="ep" id="op-reppenToken">
+  <summary>
+    <span class="m post">POST</span>
+    <span class="ep-path"><code>/api/reppen/token</code></span>
+    <span class="ep-chev" aria-hidden="true"></span>
+    <span class="ep-sum">Mint a Reppen access token for this session</span>
+  </summary>
+  <div class="ep-body">
+<p>A five-minute EdDSA JWT for the signed-in account (cookie, or the paired phone's Bearer), to send to Reppen as <code>Authorization: Bearer &lt;token&gt;</code>. Header <code>{&quot;alg&quot;:&quot;EdDSA&quot;,&quot;typ&quot;:&quot;JWT&quot;,&quot;kid&quot;:…}</code>; claims <code>iss</code> (<code>REPPEN_TOKEN_ISSUER</code>), <code>aud</code> (<code>REPPEN_TOKEN_AUDIENCE</code>), <code>sub</code> (the account id), <code>iat</code>, <code>nbf</code> (= <code>iat</code>) and <code>exp</code> (= <code>iat</code> + 300). Behind the same origin check as every other POST (see <i>CSRF</i>). After <code>/api/logout/all</code> the earlier sessions get <code>401</code>; tokens already issued stay valid until their <code>exp</code>. Exists only while both <code>REPPEN_TOKEN_ISSUER</code> and <code>REPPEN_TOKEN_AUDIENCE</code> are set; otherwise <code>404</code>.</p>
+    <p class="ep-auth"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Requires a session: the cookie set at sign-in, or <code>Authorization: Bearer &lt;token&gt;</code> from mobile-app pairing.</span></p>
+
+
+    <p class="ep-h">Responses</p>
+    <div class="ptab">
+  <div class="prow rrow">
+    <span class="r-code s2">200</span>
+    <span class="p-desc">The token and when it expires.<span class="r-sig">{ token: string, expiresAt: integer }</span></span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s4">401</span>
+    <span class="p-desc">No session, expired/revoked session, or a disabled account.<span class="r-sig"><code>{&quot;error&quot;:&quot;not signed in&quot;}</code></span></span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s4">403</span>
+    <span class="p-desc">A browser request from another origin (see <i>CSRF</i>).<span class="r-sig"><code>{&quot;error&quot;:&quot;cross-origin request refused&quot;}</code></span></span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s4">404</span>
+    <span class="p-desc">Reppen tokens are off on this instance.</span>
   </div>
     </div>
   </div>
