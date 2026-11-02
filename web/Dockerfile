@@ -87,6 +87,8 @@ COPY catalogue/media/ /usr/share/nginx/html/exercise-media/
 ENV NGINX_PORT=80
 ENV BACKEND=api
 ENV PORT=3000
+# Optional internal host:port. Empty keeps the Reppen route unavailable.
+ENV REPPEN_BACKEND=""
 # The DNS nginx asks about BACKEND on every /api request. Docker's embedded resolver by
 # default, which is correct for compose. Nothing listens on it elsewhere, and an unreachable
 # resolver makes every /api request hang rather than fail, so any other runtime has to say
