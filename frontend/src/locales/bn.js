@@ -2710,4 +2710,11 @@ export default {
   'Another device saved this set first. Yours was: {0}': 'অন্য একটি ডিভাইস এই সেটটি আগে সেভ করেছে। আপনারটি ছিল: {0}',
   'Save mine': 'আমারটা সেভ করুন',
   'cleared': 'মুছে ফেলা',
+  "Connect to finish this workout. Your entries are saved on this device.": "এই ওয়ার্কআউট শেষ করতে সংযোগ করুন। আপনার এন্ট্রিগুলি এই ডিভাইসে সংরক্ষিত আছে।",
+  "Download saved offline entries": "সংরক্ষিত অফলাইন এন্ট্রি ডাউনলোড করুন",
+  "It will enter your history after Reppen verifies it on sync.": "সিঙ্কের সময় Reppen যাচাই করলে এটি আপনার ইতিহাসে যোগ হবে।",
+  "Saved on this device. Waiting to sync.": "এই ডিভাইসে সংরক্ষিত। সিঙ্কের অপেক্ষায়।",
+  "The server result differs. Your offline entries are kept on this device.": "সার্ভারের ফলাফল আলাদা। আপনার অফলাইন এন্ট্রিগুলি এই ডিভাইসে রাখা আছে।",
+  "The server result differs. Your offline entries are kept on this device; reconnect to reconcile them.": "সার্ভারের ফলাফল আলাদা। আপনার অফলাইন এন্ট্রিগুলি এই ডিভাইসে রাখা আছে; মেলাতে আবার সংযোগ করুন।",
+  "Use server workout and keep a recovery copy": "সার্ভারের ওয়ার্কআউট ব্যবহার করুন এবং পুনরুদ্ধারের কপি রাখুন",
 }

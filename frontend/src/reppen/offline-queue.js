@@ -129,7 +129,8 @@ export function withOfflineQueue(store, { client, owner, storage, today, newId, 
     try {
       await ensure()
       const s = store.getState()
-      if (!s.workout) return
+      if (!s.workout || s.busy) return
+      if (event.kind === 'questionAnswered' && s.outbox.some(e => e.kind === event.kind && e.question === event.question && e.occurrence === event.occurrence)) return
       if (eventsOf(s).length >= 500) throw fault('needsConnection', 'This workout has reached its entry limit. Connect before continuing.')
       const next = { id: newId(), ...event }
       const outbox = [...s.outbox, next]
@@ -143,7 +144,10 @@ export function withOfflineQueue(store, { client, owner, storage, today, newId, 
       // server. They never apply a guessed plan or permit a local finish.
       const projected = queueProjection({ ...s, outbox })
       base._rememberPending([next], s.workout.revision)
-      commit({ outbox, ...(draft ? { rejected: withoutDraft(s.rejected, draft) } : {}), offlineComputed: [...(s.offlineComputed || []), ...computed], ...(projected ? { workout: { ...s.workout, effectivePlan: projected.plan, pendingQuestions: projected.pending } } : {}) })
+      const rejected = event.kind === 'setLogged' || event.kind === 'setCleared'
+        ? s.rejected.filter(r => !(r.code === 'setTaken' && r.event.slot === event.slot && r.event.step === event.step && r.event.set === event.set))
+        : draft ? withoutDraft(s.rejected, draft) : s.rejected
+      commit({ outbox, rejected, offlineComputed: [...(s.offlineComputed || []), ...computed], ...(projected ? { workout: { ...s.workout, effectivePlan: projected.plan, pendingQuestions: projected.pending } } : {}) })
       await store.getState().flush()
     } catch (e) { if (owner() === account) report(e) }
   }

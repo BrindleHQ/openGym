@@ -2631,4 +2631,11 @@ export default {
   'Another device saved this set first. Yours was: {0}': 'Inne urządzenie zapisało tę serię pierwsze. Twoja była: {0}',
   'Save mine': 'Zapisz moją',
   'cleared': 'wyczyszczona',
+  "Connect to finish this workout. Your entries are saved on this device.": "Połącz się, aby zakończyć trening. Twoje wpisy są zapisane na tym urządzeniu.",
+  "Download saved offline entries": "Pobierz zapisane wpisy offline",
+  "It will enter your history after Reppen verifies it on sync.": "Trening pojawi się w historii po weryfikacji przez Reppen podczas synchronizacji.",
+  "Saved on this device. Waiting to sync.": "Zapisano na tym urządzeniu. Oczekiwanie na synchronizację.",
+  "The server result differs. Your offline entries are kept on this device.": "Wynik serwera jest inny. Twoje wpisy offline pozostają na tym urządzeniu.",
+  "The server result differs. Your offline entries are kept on this device; reconnect to reconcile them.": "Wynik serwera jest inny. Twoje wpisy offline pozostają na tym urządzeniu; połącz się ponownie, aby je uzgodnić.",
+  "Use server workout and keep a recovery copy": "Użyj treningu z serwera i zachowaj kopię odzyskiwania",
 }

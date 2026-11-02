@@ -2624,4 +2624,11 @@ export default {
   'Another device saved this set first. Yours was: {0}': '另一台裝置先儲存了這一組。你的是：{0}',
   'Save mine': '儲存我的',
   'cleared': '已清除',
+  "Connect to finish this workout. Your entries are saved on this device.": "連線以完成此次訓練。你的紀錄已儲存在此裝置上。",
+  "Download saved offline entries": "下載已儲存的離線紀錄",
+  "It will enter your history after Reppen verifies it on sync.": "Reppen 在同步時驗證後，此次訓練將加入歷史紀錄。",
+  "Saved on this device. Waiting to sync.": "已儲存在此裝置上。等待同步。",
+  "The server result differs. Your offline entries are kept on this device.": "伺服器結果不同。你的離線紀錄仍保留在此裝置上。",
+  "The server result differs. Your offline entries are kept on this device; reconnect to reconcile them.": "伺服器結果不同。你的離線紀錄仍保留在此裝置上；請重新連線以核對紀錄。",
+  "Use server workout and keep a recovery copy": "使用伺服器上的訓練並保留復原副本",
 }

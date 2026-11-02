@@ -17,13 +17,9 @@
  * sent and kept with it, so a request repeated after a lost answer is the same request.
  */
 import { createStore } from 'zustand/vanilla'
-<<<<<<< HEAD
 import { isRevisionConflict, ReppenError } from './client.js'
-=======
-import { isRevisionConflict } from './client.js'
 import { previewOfflineFinish } from './offline-finish.js'
 import { withOfflineQueue } from './offline-queue.js'
->>>>>>> 3f573112 (Keep Reppen workouts durable through offline finish and reconnect)
 
 const KEY = owner => 'reppen.v1.' + owner
 const isSetEvent = e => e.kind === 'setLogged' || e.kind === 'setCleared'
