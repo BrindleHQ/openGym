@@ -30,6 +30,7 @@ import ReppenPrograms from './ReppenPrograms.jsx'
 import ReppenWorkout from './ReppenWorkout.jsx'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
+const initialProfile = structuredClone(useStore.getState().S)
 const mounted = []
 async function render(View) {
   const host = document.createElement('div')
