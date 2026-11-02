@@ -89,9 +89,11 @@ export const exerciseName = (names, id) => names?.[id] || id
 
 /**
  * @param {{ client: ReturnType<import('./client.js').reppenClient>, owner: () => string|null|undefined,
- *   storage?: Storage, today: () => string }} deps
+ *   storage?: Storage, today: () => string, recordFinished?: (result: object, info: { title?: string, names?: object }) => void }} deps
+ *   `recordFinished` is told of every finished workout this device learns of (its own finish, or a
+ *   finished one found on resuming), as often as it learns of it; it must be idempotent (history.js).
  */
-export function createReppenStore({ client: direct, owner, storage = globalThis.localStorage, today }) {
+export function createReppenStore({ client: direct, owner, storage = globalThis.localStorage, today, recordFinished = () => {} }) {
   let generation = 0
   // An answer that arrives after the account changed belongs to nobody here: its promise never
   // settles, so nothing after it runs, and one account's enrollment or workout cannot be written
@@ -126,6 +128,10 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         rejected: [...get().rejected, ...get().outbox.filter(event => !accepted.has(event.id)).map(event => ({ workoutId: id, event, code: 'workoutFinished' }))] })
     }
     let namesLoad = null
+    const finished = result => {
+      try { recordFinished(result, { title: get().local.enrollment?.title, names: get().exerciseNames }) }
+      catch { /* the Reppen side is done; the copy in OpenGym's history is retried on the next delivery */ }
+    }
     function enqueue(event) {
       if (!get().workout || get().busy) return Promise.resolve()
       set({ outbox: [...get().outbox, { id: newId(), ...event }] })
@@ -330,7 +336,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         try {
           const view = await client.workout(id)
           if (get().local.workoutId !== id) return null
-          if (view.status === 'completed') { completedWorkout(id, null, view.events); return null }
+          if (view.status === 'completed') { finished(view); completedWorkout(id, null, view.events); return null }
           adoptWorkout(view)
           set({ held: heldBy(view) })
           return view
@@ -399,6 +405,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
               const { enrollment } = get().local
               save({ workoutId: null, nextDay: suggestNextDay(enrollment?.days, result.workout?.day ?? workout.day, enrollment?.defaultDay) })
               set({ workout: null, finished: result })
+              finished(result)
               return true
             } catch (e) {
               if (!isRevisionConflict(e) || tries >= 2) throw e
