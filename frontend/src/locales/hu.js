@@ -2629,4 +2629,7 @@ export default {
   'Your program': 'A programod',
   'calculated': 'számított',
   'Your Reppen program saved this workout. It cannot be changed here.': 'Ezt az edzést a Reppen-programod mentette. Itt nem módosítható.',
+  'Another device saved this set first. Yours was: {0}': 'Egy másik eszköz előbb mentette ezt a sorozatot. A tiéd ez volt: {0}',
+  'Save mine': 'Az enyém mentése',
+  'cleared': 'törölve',
 }

@@ -2626,4 +2626,7 @@ export default {
   'Your program': 'Tu programa',
   'calculated': 'calculado',
   'Your Reppen program saved this workout. It cannot be changed here.': 'Tu programa de Reppen guardó este entrenamiento. No se puede cambiar aquí.',
+  'Another device saved this set first. Yours was: {0}': 'Otro dispositivo guardó esta serie primero. La tuya era: {0}',
+  'Save mine': 'Guardar la mía',
+  'cleared': 'borrada',
 }

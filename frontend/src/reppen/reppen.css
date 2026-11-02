@@ -21,3 +21,8 @@
    reading's kind under each, the way the runner puts the target under a set's field. */
 .reppen .rp-readings{margin:12px 0 4px}
 .reppen .rp-reading .rp-t{display:block;margin:5px 2px 0}
+/* A set another device saved first: this device's value under the row, with both ways out. */
+.reppen .rp-set:has(.rp-draft){flex-wrap:wrap}
+.reppen .rp-draft{flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--label-2)}
+.reppen .rp-draft>span{flex:1 1 100%}
+.reppen .rp-draft .btn{width:auto;flex:1}

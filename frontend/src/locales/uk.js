@@ -2623,4 +2623,7 @@ export default {
   'Your program': 'Ваша програма',
   'calculated': 'розрахункове',
   'Your Reppen program saved this workout. It cannot be changed here.': 'Це тренування зберегла ваша програма Reppen. Тут його не можна змінити.',
+  'Another device saved this set first. Yours was: {0}': 'Інший пристрій зберіг цей підхід першим. Ваш був: {0}',
+  'Save mine': 'Зберегти мій',
+  'cleared': 'очищено',
 }

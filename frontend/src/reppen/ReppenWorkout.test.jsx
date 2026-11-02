@@ -157,4 +157,59 @@ describe('Reppen workout screens', () => {
     await click(button(host, 'Finish workout'))
     expect(host.querySelector('.rp-finished')).toBeTruthy()
   })
+
+  it('shows a set another device saved first as a draft, and follows that device to the finish', async () => {
+    await reppenStore.getState().start('A1')
+    const id = reppenStore.getState().workout.workoutId
+    const host = await render(ReppenWorkout)
+    // The other device saves the squat's first set while this one still shows revision 0.
+    const other = (path, body) => wire.fake.handle('POST', `/v1/workouts/${id}/${path}`, body, 'u1')
+    other('events', { expectedRevision: 0, events: [{ id: 'e-other', kind: 'setLogged', slot: 'squat', step: 'work', set: 0, values: { load: 110, reps: 5 } }] })
+    // This device types 100 and ticks the set.
+    const load = row(host, 'squat|work|0').querySelector('input')
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(load, '100')
+      load.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(row(host, 'squat|work|0').querySelector('[role=checkbox]'))
+    const draft = row(host, 'squat|work|0').querySelector('.rp-draft')
+    expect(draft.textContent).toContain('Another device saved this set first. Yours was: 100 kg × 5 Reps')
+    // The row shows the value Reppen kept, not the one typed here.
+    expect(row(host, 'squat|work|0').querySelector('input').value).toBe('110')
+    await click(button(draft, 'Save mine'))
+    expect(wire.sent.at(-1).body.events[0]).toMatchObject({ kind: 'setLogged', set: 0, values: { load: 100 } })
+    expect(row(host, 'squat|work|0').querySelector('.rp-draft')).toBe(null)
+
+    // Hidden, the runner does not ask; shown again, it catches up and finds the workout finished.
+    other('finish', { expectedRevision: 2 })
+    const gets = () => wire.sent.filter(r => r.method === 'GET' && r.path.includes('/workouts/')).length
+    const before = gets()
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')))
+    expect(gets()).toBe(before)
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')))
+    await settle()
+    expect(host.querySelector('.rp-finished').textContent).toContain('Next workout: B1')
+    expect(wire.sent.filter(r => r.path.endsWith('/finish'))).toEqual([])
+  })
+
+  it('tells of a draft still open when the other device finished', async () => {
+    await reppenStore.getState().start('A1')
+    const id = reppenStore.getState().workout.workoutId
+    const host = await render(ReppenWorkout)
+    const other = (path, body) => wire.fake.handle('POST', `/v1/workouts/${id}/${path}`, body, 'u1')
+    other('events', { expectedRevision: 0, events: [{ id: 'e-other', kind: 'setLogged', slot: 'squat', step: 'work', set: 0, values: { load: 110, reps: 5 } }] })
+    await click(row(host, 'squat|work|0').querySelector('[role=checkbox]'))
+    expect(row(host, 'squat|work|0').querySelector('.rp-draft')).toBeTruthy()
+    other('finish', { expectedRevision: 1 })
+    await act(async () => window.dispatchEvent(new Event('focus')))
+    await settle()
+    expect(host.querySelector('.rp-finished')).toBeTruthy()
+    const note = host.querySelector('[role=alert]')
+    expect(note.textContent).toContain('Reppen did not take 1 of your entries.')
+    await click(button(note, 'OK'))
+    expect(reppenStore.getState().rejected).toEqual([])
+  })
 })
+

@@ -2626,4 +2626,7 @@ export default {
   'Your program': 'Programın',
   'calculated': 'hesaplandı',
   'Your Reppen program saved this workout. It cannot be changed here.': 'Bu antrenmanı Reppen programın kaydetti. Burada değiştirilemez.',
+  'Another device saved this set first. Yours was: {0}': 'Başka bir cihaz bu seti önce kaydetti. Seninki: {0}',
+  'Save mine': 'Benimkini kaydet',
+  'cleared': 'temizlendi',
 }

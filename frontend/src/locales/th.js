@@ -2637,4 +2637,7 @@ export default {
   'Your program': 'โปรแกรมของคุณ',
   'calculated': 'คำนวณแล้ว',
   'Your Reppen program saved this workout. It cannot be changed here.': 'โปรแกรม Reppen ของคุณบันทึกการออกกำลังกายนี้ไว้ แก้ไขที่นี่ไม่ได้',
+  'Another device saved this set first. Yours was: {0}': 'อุปกรณ์อื่นบันทึกเซ็ตนี้ก่อน ของคุณคือ: {0}',
+  'Save mine': 'บันทึกของฉัน',
+  'cleared': 'ล้างแล้ว',
 }
