@@ -2180,6 +2180,9 @@ const routes = {
       // Public like the two flags above: the caps are not a secret, and the absence of the
       // block is how the app knows this server does not take photos and videos at all.
       ...(MEDIA_ON ? { media: mediaConfig(MEDIA_LIMITS) } : {}),
+      // Only when the Reppen token routes exist, so the app shows no Reppen screens otherwise and
+      // an instance without it answers exactly as before. Public like `media`: a feature flag.
+      ...(REPPEN.enabled ? { reppen: true } : {}),
       ...(readSession(req) ? { coach: coachConfig.publicConfig() } : {})
     });
   },

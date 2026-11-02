@@ -289,6 +289,14 @@ paths:
                       Present (and true) only when the instance runs with
                       PASSWORD_LOGIN=1; the client then offers name-and-password
                       sign-in next to passkeys.
+                  reppen:
+                    type: boolean
+                    const: true
+                    description: >-
+                      Present (and true) only when the instance runs with both
+                      REPPEN_TOKEN_ISSUER and REPPEN_TOKEN_AUDIENCE set, that is when
+                      `POST /api/reppen/token` exists. The app shows its Reppen program
+                      screens only then.
                   default_lang:
                     type: string
                     example: pt-BR
