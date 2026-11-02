@@ -125,7 +125,7 @@ jobs:
         working-directory: frontend
         run: |
           LD_PRELOAD="${FAKE_PRELOAD:-}" node -e 'console.log("clock:", new Date().toString())'
-          LD_PRELOAD="${FAKE_PRELOAD:-}" npx vitest run ${{ matrix.shuffle && '--sequence.shuffle' || '' }} --reporter=default --reporter=json --outputFile.json=test-results.json
+          LD_PRELOAD="${FAKE_PRELOAD:-}" npx vitest run --maxWorkers=2 ${{ matrix.shuffle && '--sequence.shuffle' || '' }} --reporter=default --reporter=json --outputFile.json=test-results.json
       - name: API suite
         id: api
         continue-on-error: true
