@@ -2,11 +2,11 @@
 /* A stand-in for the Reppen workout API, for the app's tests and for clicking through the Reppen
  * screens without the real service. It speaks the same wire contract (reppen-core
  * backend/README.md: /v1/program-catalog, enrollments, workouts, events, finish, activate,
- * history) for one small two-day program, with no Reppen engine behind it: targets come from a
+ * history, and /v1/exercise-catalog for the program's lifts) for one small two-day program, with no Reppen engine behind it: targets come from a
  * fixed formula, and one question ("Add a back-off set?") appears once the squat's work sets are
  * logged, whose "yes" adds a set at 90% of the heaviest logged squat.
  *
- *   createFakeReppen()  in-process: { handle(method, path, body, sub) -> { status, body } }
+ *   createFakeReppen()  in-process: { handle(method, path, body, sub, headers) -> { status, body, headers? } }
  *   node scripts/reppen-fake.mjs --port 8080 [--jwks http://127.0.0.1:3000/api/reppen/jwks]
  *     serves it over HTTP. With --jwks every request needs a Bearer token that verifies against
  *     that key set (EdDSA, exp/nbf), the way the real service checks OpenGym's tokens; the
@@ -28,6 +28,22 @@ const CATALOG = [{
   readings: LIFTS.map(([, key]) => ({ fact: 'e1rm', key, required: true, type: { t: 'q', dim: { mass: 1 } } })),
   days: ['A1', 'B1'], defaultDay: 'A1', artifactPath: '/v1/program-artifacts/' + ARTIFACT,
 }]
+
+// GET /v1/exercise-catalog for the two lifts, with their ids and names as reppen-core's
+// catalog/exercises-v1.json has them. Served the way backend/src/catalog.rs serves the whole file:
+// the same bytes every time, a strong ETag (the quoted sha256 of those bytes), and 304 to an
+// If-None-Match that matches it.
+const EXERCISES = {
+  format: 'reppen.exercise-catalog/1', version: '2026-10-25', generatedAt: '2026-10-25T10:08:34Z',
+  entries: [
+    { id: 'wger:111', source: 'wger', name: 'Barbell Back Squat', aliases: ['Squats'], category: 'Legs' },
+    { id: 'wger:192', source: 'wger', name: 'Barbell Bench Press', aliases: ['Bench Press'], category: 'Chest' },
+  ],
+  retired: [],
+}
+const EXERCISES_ETAG = '"' + crypto.createHash('sha256').update(JSON.stringify(EXERCISES)).digest('hex') + '"'
+const unchanged = ifNoneMatch => String(ifNoneMatch || '').split(',').map(s => s.trim())
+  .some(tag => tag === '*' || tag.replace(/^W\//, '') === EXERCISES_ETAG)
 
 const round = (n, grid = 2.5) => Math.round(n / grid) * grid
 const fixed = (v, b = 'exact') => ({ k: 'fixed', v: { b, v } })
@@ -146,12 +162,16 @@ export function createFakeReppen({ now = () => new Date() } = {}) {
     return finish(a, w, body)
   }
 
-  function route(method, path, body, sub) {
+  function route(method, path, body, sub, headers) {
     const a = of(sub)
     const [p, query = ''] = path.split('?')
     const parts = p.split('/').filter(Boolean).map(decodeURIComponent)
     if (parts[0] !== 'v1') return err(404, 'notFound')
     const [, kind, id, action] = parts
+    if (method === 'GET' && kind === 'exercise-catalog' && !id) {
+      const cache = { etag: EXERCISES_ETAG, 'cache-control': 'private, no-cache' }
+      return unchanged(headers['if-none-match']) ? { status: 304, body: null, headers: cache } : { status: 200, body: EXERCISES, headers: cache }
+    }
     if (method === 'GET' && kind === 'program-catalog' && !id) return { status: 200, body: { format: 'reppen.program-catalog/1', items: CATALOG, nextCursor: null } }
     if (kind === 'enrollments' && id && !action) {
       if (method === 'GET') return a.enrollments.has(id) ? { status: 200, body: a.enrollments.get(id) } : err(404, 'enrollmentNotFound')
@@ -202,9 +222,10 @@ export function createFakeReppen({ now = () => new Date() } = {}) {
   }
 
   return {
-    handle(method, path, body, sub) {
+    /** `headers` are the request's, by lower-case name; only If-None-Match is read. */
+    handle(method, path, body, sub, headers = {}) {
       if (!sub) return { status: 401, body: { error: 'unauthenticated', reason: 'noClaims' } }
-      return route(method, path, body ?? {}, sub)
+      return route(method, path, body ?? {}, sub, headers)
     },
   }
 }
@@ -239,10 +260,10 @@ export async function serve({ port = 8080, jwks = null } = {}) {
     for await (const chunk of req) raw += chunk
     let body = null
     try { body = raw ? JSON.parse(raw) : null } catch { body = null }
-    const { status, body: out } = fake.handle(req.method, req.url, body, await subOf(req.headers.authorization))
+    const { status, body: out, headers = {} } = fake.handle(req.method, req.url, body, await subOf(req.headers.authorization), req.headers)
     console.log(req.method, req.url, status)
-    res.writeHead(status, { 'content-type': 'application/json', 'x-reppen-contract': 'reppen.workout-api/1' })
-    res.end(JSON.stringify(out))
+    res.writeHead(status, { ...(status === 304 ? {} : { 'content-type': 'application/json' }), 'x-reppen-contract': 'reppen.workout-api/1', ...headers })
+    res.end(status === 304 ? undefined : JSON.stringify(out))
   })
   await new Promise(r => server.listen(port, '127.0.0.1', r))
   return server

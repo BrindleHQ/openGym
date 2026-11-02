@@ -38,21 +38,24 @@ const seg = s => encodeURIComponent(String(s))
  *   `base` is the URL Reppen is reached at, ending in "/" (e.g. "/reppen/").
  */
 export function reppenClient({ base, token, fetch: doFetch = (...a) => globalThis.fetch(...a) }) {
-  async function once(method, path, body, bearer) {
+  async function send(method, path, body, bearer, extra = {}) {
     const ctl = new AbortController()
     const timer = setTimeout(() => ctl.abort(), method === 'GET' ? TIMEOUT_GET_MS : TIMEOUT_MS)
-    let r
     try {
-      r = await doFetch(base() + 'v1/' + path, {
+      return await doFetch(base() + 'v1/' + path, {
         method,
-        headers: { Authorization: 'Bearer ' + bearer, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
+        headers: { Authorization: 'Bearer ' + bearer, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...extra.headers },
         body: body !== undefined ? JSON.stringify(body) : undefined,
         signal: ctl.signal,
         credentials: 'omit',   // Reppen takes the Bearer only, never this origin's cookies
+        ...(extra.cache ? { cache: extra.cache } : {}),
       })
     } catch {
       throw new ReppenError(0, null, 'Reppen could not be reached')
     } finally { clearTimeout(timer) }
+  }
+
+  async function read(r) {
     let data = null
     try { data = await r.json() } catch { /* not JSON: someone else's answer, judged below */ }
     if (!r.ok) throw new ReppenError(r.status, data && typeof data === 'object' ? data : null)
@@ -61,16 +64,27 @@ export function reppenClient({ base, token, fetch: doFetch = (...a) => globalThi
   }
 
   // A token refused (expired early, a key rotated) is replaced once; a second 401 is the answer.
-  async function call(method, path, body) {
-    try { return await once(method, path, body, await token()) }
+  async function authed(run) {
+    try { return await run(await token()) }
     catch (e) {
       if (!(e instanceof ReppenError) || e.status !== 401) throw e
-      return once(method, path, body, await token({ fresh: true }))
+      return run(await token({ fresh: true }))
     }
   }
+  const call = (method, path, body) => authed(async bearer => read(await send(method, path, body, bearer)))
 
   return {
     catalog: (cursor = null) => call('GET', 'program-catalog?limit=100' + (cursor ? '&cursor=' + seg(cursor) : '')),
+    /**
+     * The exercise catalog (reppen.exercise-catalog/1), revalidated against the copy tagged `etag`.
+     * Resolves { notModified: true } when that copy is current, else { catalog, etag }. The browser's
+     * own cache stays out of it, so the 304 reaches here and the caller's copy is the only one.
+     */
+    exerciseCatalog: (etag = null) => authed(async bearer => {
+      const r = await send('GET', 'exercise-catalog', undefined, bearer, { headers: etag ? { 'If-None-Match': etag } : {}, cache: 'no-store' })
+      if (r.status === 304) return { notModified: true }
+      return { catalog: await read(r), etag: r.headers.get('ETag') }
+    }),
     enrollment: id => call('GET', 'enrollments/' + seg(id)),
     /** @param {{ artifactId: string, startOn: string, params?: object, readings?: object[] }} body */
     enroll: (id, body) => call('PUT', 'enrollments/' + seg(id), body),

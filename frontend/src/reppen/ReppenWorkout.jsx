@@ -10,6 +10,7 @@ import { Button, Check, NumberField } from '../components/ui.jsx'
 import { reppenAvailable, reppenStore, useReppen } from './connection.js'
 import { loggedSets, metricOrder, posKey, startValue, targetText } from './plan.js'
 import { errorText } from './messages.js'
+import { exerciseName } from './store.js'
 import { Held } from './ReppenPrograms.jsx'
 import './reppen.css'
 
@@ -42,11 +43,14 @@ function SetRow({ slot, step, set, index, number, logged, unit }) {
 }
 
 function SlotCard({ slot, logged, unit }) {
+  const names = useReppen(s => s.exerciseNames)
   // Sets are numbered through the exercise, as on the app's own workout screen; each still logs
   // under its own step key and index.
   let number = 0
+  // The program's own label; the catalog's name when a plan has none.
+  const title = slot.exercise?.label || (slot.exercise?.id ? exerciseName(names, slot.exercise.id) : slot.slot)
   return <div className="card rp-slot" data-slot={slot.slot}>
-    <h2>{slot.exercise?.label || slot.slot}</h2>
+    <h2>{title}</h2>
     {slot.steps.map(step => <div key={step.key} className="rp-step" data-step={step.key}>
       {step.live && <p className="sect-f">{t('Reppen calculated these targets from the sets you logged.')}</p>}
       {step.sets.map((set, i) => <SetRow key={i} slot={slot.slot} step={step} set={set} index={i} number={++number}
@@ -91,6 +95,7 @@ export default function ReppenWorkout() {
   useEffect(() => {
     if (!ok) return
     actions().hydrate()
+    actions().loadExerciseNames()
     const st = actions()
     if (st.workout && st.workout.workoutId === st.local.workoutId) { setLoaded(true); return }
     st.resume().finally(() => setLoaded(true))

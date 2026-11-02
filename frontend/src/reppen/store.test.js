@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createReppenStore, massReading, newId, suggestNextDay } from './store.js'
-import { ReppenError } from './client.js'
+import { createReppenStore, exerciseName, exerciseNames, massReading, newId, suggestNextDay } from './store.js'
+import { ReppenError, reppenClient } from './client.js'
+import { createFakeReppen } from '../../scripts/reppen-fake.mjs'
 import { GZCLP, fakeClient } from './test-fixtures.js'
 
 function memoryStorage() {
@@ -82,5 +83,62 @@ describe('Reppen store: programs', () => {
     expect(suggestNextDay(GZCLP.days, 'B2', 'A1')).toBe('A1')
     expect(suggestNextDay(GZCLP.days, 'X', 'A1')).toBe('A1')
     expect(newId()).not.toBe(newId())
+  })
+})
+
+describe('Reppen store: exercise names', () => {
+  // The fake Reppen through the real client, so the ETag and the 304 are the wire's own.
+  function wired() {
+    const fake = createFakeReppen()
+    const sent = []
+    const fetch = vi.fn(async (url, init) => {
+      const headers = Object.fromEntries(new Headers(init.headers))
+      sent.push(headers['if-none-match'] ?? null)
+      const answer = fake.handle(init.method, url.replace(/^\/reppen/, ''), undefined, 'u1', headers)
+      return new Response(answer.status === 304 ? null : JSON.stringify(answer.body), { status: answer.status, headers: answer.headers })
+    })
+    return { client: reppenClient({ base: () => '/reppen/', token: async () => 't', fetch }), sent }
+  }
+  const page = (client, storage) => createReppenStore({ client, owner: () => 'u1', storage, today: () => '2026-11-01' })
+
+  it('keeps the catalog names with their ETag and revalidates them on the next page load', async () => {
+    const { client, sent } = wired()
+    const storage = memoryStorage()
+    const first = page(client, storage)
+    await first.getState().loadExerciseNames()
+    expect(first.getState().exerciseNames).toMatchObject({ 'wger:111': 'Barbell Back Squat', 'wger:192': 'Barbell Bench Press' })
+    const etag = JSON.parse(storage.getItem('reppen.exercise-names.v1')).etag
+    expect(etag).toMatch(/^"[0-9a-f]{64}"$/)
+
+    const next = page(client, storage)
+    const loading = next.getState().loadExerciseNames()
+    expect(next.getState().exerciseNames['wger:111']).toBe('Barbell Back Squat')   // the kept copy, before any answer
+    await loading
+    await next.getState().loadExerciseNames()   // once per page load
+    expect(sent).toEqual([null, etag])
+    expect(next.getState().exerciseNames['wger:192']).toBe('Barbell Bench Press')
+  })
+
+  it('takes a changed catalog, ignores a format it does not know, and retries after a failure', async () => {
+    const storage = memoryStorage()
+    storage.setItem('reppen.exercise-names.v1', JSON.stringify({ etag: '"old"', names: { 'wger:111': 'Squat' } }))
+    const exerciseCatalog = vi.fn()
+      .mockRejectedValueOnce(new ReppenError(0, null))
+      .mockResolvedValueOnce({ catalog: { format: 'reppen.exercise-catalog/1', entries: [{ id: 'wger:111', name: 'Barbell Back Squat' }], retired: [{ id: 'old', name: 'Old Lift' }] }, etag: '"new"' })
+    const s = createReppenStore({ client: fakeClient({ exerciseCatalog }), owner: () => 'u1', storage, today: () => '2026-11-01' })
+    await s.getState().loadExerciseNames()
+    expect(s.getState().exerciseNames).toEqual({ 'wger:111': 'Squat' })
+    expect(s.getState().error).toBe(null)
+    await s.getState().loadExerciseNames()
+    expect(exerciseCatalog.mock.calls).toEqual([['"old"'], ['"old"']])
+    expect(s.getState().exerciseNames).toEqual({ old: 'Old Lift', 'wger:111': 'Barbell Back Squat' })
+    expect(JSON.parse(storage.getItem('reppen.exercise-names.v1')).etag).toBe('"new"')
+    expect(exerciseNames({ format: 'reppen.exercise-catalog/2', entries: [{ id: 'a', name: 'A' }] })).toBe(null)
+  })
+
+  it('shows the id when the catalog has no name for it', () => {
+    expect(exerciseName({ 'wger:111': 'Barbell Back Squat' }, 'wger:111')).toBe('Barbell Back Squat')
+    expect(exerciseName({ 'wger:111': 'Barbell Back Squat' }, 'wger:999')).toBe('wger:999')
+    expect(exerciseName(null, 'wger:111')).toBe('wger:111')
   })
 })
