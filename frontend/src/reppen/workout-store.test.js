@@ -358,6 +358,41 @@ describe('Reppen store: two devices on one workout', () => {
     expect(laptop.getState().workout.revision).toBe(3)
   })
 
+  it('settles every lost offline edit to a set when its latest draft is saved or discarded', async () => {
+    const { w, phone, laptop } = await twoDevices()
+    w.net.down = true
+    await laptop.getState().logSet('squat', 'work', 0, { load: 50, reps: 5 })
+    await laptop.getState().clearSet('squat', 'work', 0)
+    await laptop.getState().logSet('squat', 'work', 0, { load: 55, reps: 5 })
+    w.net.down = false
+    await phone.getState().logSet('squat', 'work', 0, { load: 100, reps: 5 })
+    await laptop.getState().catchUp()
+    expect(laptop.getState().rejected).toHaveLength(3)
+    // Saving the latest sends 55 once; the superseded clear and 50 do not come back as conflicts.
+    await laptop.getState().relogDraft(laptop.getState().rejected.at(-1))
+    expect(laptop.getState().rejected).toEqual([])
+    expect(values(laptop)).toEqual([100, 55])
+    expect(laptop.getState().workout.events.filter(e => e.kind === 'setCleared')).toEqual([])
+  })
+
+  it('does not fail a send whose workout a catch-up found finished meanwhile', async () => {
+    const { w, phone, laptop } = await twoDevices()
+    await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    await phone.getState().finish()
+    let release
+    const gate = new Promise(r => { release = r })
+    const real = w.client.appendEvents
+    w.client.appendEvents = async (...a) => { await gate; return real(...a) }
+    const send = laptop.getState().logSet('bench', 'work', 1, { load: 50, reps: 10 })
+    await laptop.getState().catchUp()
+    expect(laptop.getState().workout).toBe(null)
+    release()
+    await expect(send).resolves.toBeUndefined()
+    w.client.appendEvents = real
+    expect(laptop.getState().error).toBe(null)
+    expect(laptop.getState().finished).not.toBe(null)
+  })
+
   it('moves the other device to the finished state without finishing again', async () => {
     const { w, phone, laptop, recordFinished } = await twoDevices()
     await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })

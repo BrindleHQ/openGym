@@ -37,8 +37,9 @@ function SetRow({ slot, step, set, index, number, logged, taken, unit, disabled 
   const metrics = metricOrder(set.metrics)
   const [draft, setDraft] = useState({})
   const done = !!logged
-  // A logged set shows what Reppen holds, which may be another device's value, not what was typed here.
-  const value = m => (!done && m in draft ? draft[m] : startValue(set.metrics[m], logged?.values?.[m]))
+  // A logged set shows what Reppen holds, which may be another device's value, not what was typed
+  // here, and a metric logged blank stays blank rather than falling back to the target.
+  const value = m => (done ? logged.values?.[m] ?? null : m in draft ? draft[m] : startValue(set.metrics[m]))
   const toggle = () => {
     if (done) return actions().clearSet(slot, step.key, index)
     const values = {}

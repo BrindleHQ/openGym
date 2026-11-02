@@ -183,6 +183,22 @@ describe('Reppen workout screens', () => {
     expect(host.textContent).toContain('GZCLP (test program)')
   })
 
+  it('keeps a metric logged blank blank, instead of showing the target', async () => {
+    let host = await render(ReppenPrograms)
+    await click(button(host, 'Start A1'))
+    act(() => { mounted.splice(0).forEach(r => r.unmount()) })
+    host = await render(ReppenWorkout)
+    const load = row(host, 'squat|work|0').querySelector('input')
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(load, '')
+      load.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(row(host, 'squat|work|0').querySelector('[role=checkbox]'))
+    expect(wire.sent.filter(r => r.path.endsWith('/events')).at(-1).body.events[0].values).toEqual({ reps: 5 })
+    expect(row(host, 'squat|work|0').className).toContain('done')
+    expect(row(host, 'squat|work|0').querySelector('input').value).toBe('')
+  })
+
   it('names an exercise from the catalog when the plan gives it no label', async () => {
     await reppenStore.getState().start('A1')
     const host = await render(ReppenWorkout)

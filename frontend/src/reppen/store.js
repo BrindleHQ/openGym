@@ -22,6 +22,8 @@ import { isRevisionConflict } from './client.js'
 const KEY = owner => 'reppen.v1.' + owner
 const isSetEvent = e => e.kind === 'setLogged' || e.kind === 'setCleared'
 const samePos = (a, b) => a.slot === b.slot && a.step === b.step && a.set === b.set
+const dropDraftsAt = (rejected, draft) =>
+  rejected.filter(r => r !== draft && !(r.code === 'setTaken' && samePos(r.event, draft.event)))
 
 export function newId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
@@ -172,6 +174,9 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
     }
     // A refused batch: true when the outbox was put right and can be sent again.
     async function recover(e, id, current) {
+      // A catch-up during the send may already have found the workout finished and moved the
+      // outbox to the rejected drafts; there is nothing left to put right or send.
+      if (!current()) return true
       if (isRevisionConflict(e) || e.code === 'workoutFinished') {
         // Fetch what Reppen holds; events of ours already among them were accepted (a lost answer).
         const view = await client.workout(id).catch(() => null)
@@ -394,12 +399,14 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
        *  else all but the per-set drafts. */
       dismissRejected() { set({ rejected: get().workout ? get().rejected.filter(r => r.code === 'setTaken') : [] }) },
       /** A set another device logged first: send this device's value over it, or drop it. */
+      // Several offline edits to one set can lose the same race; the runner shows the latest, and
+      // saving or discarding it settles the set, so the older ones go with it.
       relogDraft(draft) {
-        set({ rejected: get().rejected.filter(r => r !== draft) })
+        set({ rejected: dropDraftsAt(get().rejected, draft) })
         const { id, ...event } = draft.event
         return enqueue(event)
       },
-      discardDraft(draft) { set({ rejected: get().rejected.filter(r => r !== draft) }) },
+      discardDraft(draft) { set({ rejected: dropDraftsAt(get().rejected, draft) }) },
 
       /** Fetches the workout and takes what other devices did, then sends what is still waiting.
        *  The runner calls it on focus, when shown again, back online, and every so often. A failed
