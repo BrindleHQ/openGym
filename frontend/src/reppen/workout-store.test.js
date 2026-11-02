@@ -427,7 +427,8 @@ describe('Reppen store: two devices on one workout', () => {
     await laptop.getState().catchUp()
     await laptop.getState().continueActive()
     expect(laptop.getState().workout.workoutId).toBe(tablet.getState().workout.workoutId)
-    expect(laptop.getState().rejected).toEqual([])
+    expect(laptop.getState().rejected).toMatchObject([{ code: 'workoutChanged', event: { values: { load: 105 } } }])
+    expect(laptop.getState().rejected.every(r => r.workoutId !== laptop.getState().workout.workoutId)).toBe(true)
     expect(laptop.getState().outbox).toEqual([])
   })
 
