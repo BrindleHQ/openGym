@@ -248,6 +248,9 @@ self.addEventListener('pushsubscriptionchange', e => {
 // once the network was gone — the page then took it for the server's word. The Cache API ignores
 // the API's own `Cache-Control: no-store`, so the worker has to know to stay out of the way.
 const API = (() => { try { return new URL('api/', location.href).pathname } catch { return '/api/' } })()
+// The Reppen service is proxied next to the API (/reppen/ beside /api/) and is data the same way:
+// a cached workout handed back offline as a 200 would look like Reppen's current answer.
+const REPPEN = (() => { try { return new URL('reppen/', location.href).pathname } catch { return '/reppen/' } })()
 
 // How long a request for the app itself waits on the network before a cached copy answers it.
 const NET_WAIT_MS = 3000
@@ -267,6 +270,7 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url)
   if (e.request.method !== 'GET' || url.origin !== location.origin) return
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith(API)) return    // never cache auth/data
+  if (url.pathname.startsWith(REPPEN)) return
 
   if (isMediaPath(url.pathname)) {
     e.respondWith(media(e))

@@ -13,6 +13,7 @@ const backend = process.env.API_TARGET || 'http://127.0.0.1:3000'
 // presenting the expected Origin here covers the ones that don't send it. Match your .env if you
 // changed ORIGIN: API_ORIGIN=https://gym.example.com npm run dev
 const apiOrigin = process.env.API_ORIGIN || 'http://localhost:8080'
+const reppen = process.env.REPPEN_DEV_URL || 'http://localhost:8080'
 // Exercise media: served straight from catalogue/media in dev (see catalogueMedia below), or
 // proxied to a server of your choice with MEDIA_TARGET.
 const media = process.env.MEDIA_TARGET
@@ -111,6 +112,9 @@ export default defineConfig({
     fs: { allow: ['..'] },
     proxy: {
       '/api': { target: backend, changeOrigin: true, headers: { Origin: apiOrigin } },
+      // The Reppen service, which the app calls on its own origin under /reppen. The proxy in
+      // front of a deployment strips the prefix the same way. REPPEN_DEV_URL=http://host:port
+      '/reppen': { target: reppen, changeOrigin: true, rewrite: p => p.replace(/^\/reppen(?=\/|$)/, '') },
       ...(media ? {
         '/exercise-media': { target: media, changeOrigin: true }
       } : {})

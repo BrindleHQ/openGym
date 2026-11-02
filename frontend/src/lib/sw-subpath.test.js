@@ -58,6 +58,16 @@ describe('the service worker and the API', () => {
     expect(env.store.size).toBe(0)
   })
 
+  it('leaves the Reppen service alone too, at the root and under a subpath', async () => {
+    for (const [sw, url] of [['https://gym.example.com/sw.js', 'https://gym.example.com/reppen/v1/workouts/w1'],
+      ['https://example.com/myGym/sw.js', 'https://example.com/myGym/reppen/v1/history?limit=50']]) {
+      const env = worker(sw)
+      env.net.body = { workoutId: 'w1', revision: 3 }
+      expect((await env.get(url)).intercepted).toBe(false)
+      expect(env.store.size).toBe(0)
+    }
+  })
+
   it('still serves the app itself from the cache under that subpath', async () => {
     const env = worker('https://example.com/myGym/sw.js')
     env.net.body = { app: true }
