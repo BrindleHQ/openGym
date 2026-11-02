@@ -79,6 +79,7 @@ const Library = lazyView(() => import('./views/Library.jsx'))
 const Muscles = lazyView(() => import('./views/Muscles.jsx'))
 // Reppen programs (src/reppen): only on an instance with Reppen on, so most never load it.
 const ReppenPrograms = lazyView(() => import('./reppen/ReppenPrograms.jsx'))
+const ReppenWorkout = lazyView(() => import('./reppen/ReppenWorkout.jsx'))
 const SettingsRoute = lazyView(() => import('./views/Settings.jsx').then(m => ({ default: m.SettingsRoute })))
 let viewsPrefetched = false
 const prefetchViews = () => {
@@ -317,6 +318,7 @@ function Shell() {
       <Route path="/coach/setup" element={<CoachSetup />} />
       {/* Reppen gates itself on the instance config, like the Coach. */}
       <Route path="/reppen" element={<ReppenPrograms />} />
+      <Route path="/reppen/workout" element={<ReppenWorkout />} />
       <Route path="/admin" element={user?.admin ? <Admin /> : <Navigate to="/home" replace />} />
       <Route path="*" element={<Navigate to="/home" replace />} />
     </Routes>
