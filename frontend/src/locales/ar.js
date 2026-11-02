@@ -1,5 +1,6 @@
 // Arabic UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Confirm starting weights and equipment increments in lb (dumbbells per hand).': 'أكد أوزان البداية وزيادات المعدات بالرطل (الدمبل لكل يد).',
   'Confirm': 'تأكيد',
   'Cancel': 'إلغاء',
   'Press back again to exit': 'اضغط زر الرجوع مرة أخرى للخروج',

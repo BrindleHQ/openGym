@@ -28,6 +28,7 @@ import { useStore } from '../store/useStore.js'
 import { reppenStore } from './connection.js'
 import ReppenPrograms from './ReppenPrograms.jsx'
 import ReppenWorkout from './ReppenWorkout.jsx'
+import dorito from './dorito-fixture.json'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const mounted = []
@@ -65,6 +66,34 @@ beforeEach(async () => {
 afterEach(() => { act(() => { mounted.splice(0).forEach(r => r.unmount()) }); document.body.innerHTML = '' })
 
 describe('Reppen workout screens', () => {
+  it('renders every real Dorito quality, fifth-set, recovery and duration choice without skipping', async () => {
+    await reppenStore.getState().start('A1')
+    const host = await render(ReppenWorkout)
+    const questions = Object.entries(dorito.questions).map(([id, q]) => ({ id, occurrence: 'occ-' + id, text: q.text,
+      choices: Object.entries(q.answer.labels).map(([tag, label]) => ({ label, value: { v: 'enum', name: q.answer.name, tag } })) }))
+    const answer = vi.spyOn(reppenStore.getState(), 'answer').mockResolvedValue()
+    await act(async () => reppenStore.setState(s => ({ workout: { ...s.workout, pendingQuestions: questions } })))
+    expect(host.querySelectorAll('.rp-question')).toHaveLength(46)
+    expect(button(host, 'Finish workout').disabled).toBe(true)
+    for (const q of questions) {
+      const card = host.querySelector(`[data-question="${q.id}"]`)
+      expect(card.textContent).toContain(q.text)
+      for (const [i, choice] of q.choices.entries()) {
+        expect(card.querySelectorAll('button')[i].textContent).toBe(choice.label)
+        await act(async () => card.querySelectorAll('button')[i].click())
+        expect(answer).toHaveBeenLastCalledWith(q, choice)
+      }
+    }
+    answer.mockRestore()
+  })
+
+  it('explains online-required finish while disconnected even with no unsent sets', async () => {
+    await reppenStore.getState().start('A1')
+    const host = await render(ReppenWorkout)
+    await act(async () => reppenStore.setState({ offline: true, offlinePack: null, outbox: [] }))
+    expect(button(host, 'Finish workout').disabled).toBe(true)
+    expect(host.textContent).toContain('Connect to finish this workout. Your entries are saved on this device.')
+  })
   it('resets typed set drafts when continuing another workout', async () => {
     await reppenStore.getState().start('A1')
     await reppenStore.getState().start('B1')

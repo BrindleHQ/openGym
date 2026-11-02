@@ -1,5 +1,6 @@
 // Korean UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Confirm starting weights and equipment increments in lb (dumbbells per hand).': '시작 중량과 장비 증량 단위를 lb로 확인하세요(덤벨은 한 손 기준).',
   'Confirm': '확인',
   'Cancel': '취소',
   'Press back again to exit': '뒤로를 한 번 더 누르면 종료됩니다',

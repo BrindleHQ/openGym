@@ -20,6 +20,7 @@ import { createStore } from 'zustand/vanilla'
 import { isRevisionConflict, ReppenError } from './client.js'
 import { previewOfflineFinish } from './offline-finish.js'
 import { withOfflineQueue } from './offline-queue.js'
+import { supportedMass, positive, validSetup, setupParams } from './setup.js'
 
 const KEY = owner => 'reppen.v1.' + owner
 const isSetEvent = e => e.kind === 'setLogged' || e.kind === 'setCleared'
@@ -49,7 +50,7 @@ export const massReading = (reading, kg, observedOn) =>
 export const massReadings = entry => (entry?.readings || []).filter(r => r?.type?.t === 'q' && r.type.dim?.mass === 1)
 
 /** The parameters a program needs a value for that this form cannot ask: the non-optional ones. */
-export const unaskedParameters = entry => (entry?.parameters || []).filter(p => p?.type?.t !== 'opt')
+export const unaskedParameters = entry => (entry?.parameters || []).filter(p => p?.type?.t !== 'opt' && !supportedMass(p))
 
 /** Every optional parameter, declared empty. Reppen refuses an enrollment that leaves one out. */
 export const emptyParams = entry => Object.fromEntries((entry?.parameters || []).filter(p => p?.type?.t === 'opt')
@@ -114,10 +115,14 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
     },
   })
   const store = createStore((set, get) => {
-    const save = patch => {
+    const save = (patch, durable = false) => {
       const who = owner()
       const local = { ...get().local, ...patch }
-      try { storage.setItem(KEY(who), JSON.stringify(local)) } catch { /* private mode: kept for this page only */ }
+      try {
+        const bytes = JSON.stringify(local)
+        storage.setItem(KEY(who), bytes)
+        if (durable && storage.getItem(KEY(who)) !== bytes) throw Error('Storage did not retain enrollment')
+      } catch (e) { if (durable) throw e /* other pointers may remain in memory in private mode */ }
       set({ local, localOwner: who })
     }
     let flushRun = null
@@ -286,22 +291,29 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       },
 
       /** Enrolls in a catalog program with the readings it asks for ({ [reading index]: kg }). */
-      async enroll(entry, kgByReading) {
+      async enroll(entry, kgByReading = {}, setup = {}, confirmed = false) {
         if (get().busy) return false
         const saved = get().local.pendingEnrollment
         if (saved && saved.artifactId !== entry.artifactId) {
           set({ error: { code: 'enrollmentPending' } })
           return false
         }
+        if (!saved && (unaskedParameters(entry).length || !validSetup(entry, setup, confirmed)
+          || (entry.readings || []).some(r => r.required && !massReadings(entry).includes(r))
+          || massReadings(entry).some((r, i) => (r.required || kgByReading[i] != null) && !positive(kgByReading[i])))) {
+          set({ error: { code: 'invalidSetup' } }); return false
+        }
         const day = today()
         const readings = massReadings(entry).map((r, i) => kgByReading[i] > 0 ? massReading(r, kgByReading[i], day) : null).filter(Boolean)
         // Keep the full request: retries after edits, midnight, or reload must send identical bytes.
         const pending = saved || {
           enrollmentId: newId(), artifactId: entry.artifactId,
-          body: { artifactId: entry.artifactId, startOn: day, params: emptyParams(entry), readings },
+          body: { artifactId: entry.artifactId, startOn: day, params: { ...emptyParams(entry), ...setupParams(entry, setup) }, readings },
           kgByReading: { ...kgByReading },
+          setup: { ...setup }, confirmed,
         }
-        save({ pendingEnrollment: pending })
+        try { save({ pendingEnrollment: pending }, true) }
+        catch { set({ error: { code: 'enrollmentStorage' } }); return false }
         set({ busy: true, error: null })
         try {
           const view = await client.enroll(pending.enrollmentId, pending.body)

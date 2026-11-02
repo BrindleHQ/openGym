@@ -59,6 +59,22 @@ function world() {
 }
 
 describe('durable offline workout chain', () => {
+  it('retains and replays logs when coaching refuses an offline pack and finish', async () => {
+    const w = world(); let s = w.device()
+    w.client.offlinePack.mockRejectedValue(new ReppenError(409, { error: 'needsConnection' }))
+    await s.getState().start('A')
+    await expect(s.getState().loadOfflinePack()).rejects.toMatchObject({ code: 'needsConnection' })
+    w.net.down = true
+    await s.getState().logSet('s', 'work', 0, { load: 100, reps: 5 })
+    expect(await s.getState().finish()).toBe(false)
+    expect(s.getState().error.code).toBe('needsConnection')
+    expect(s.getState().outbox).toHaveLength(1)
+    expect(s.getState().offlineJournal).toHaveLength(0)
+    s = w.device(); expect(s.getState().outbox).toHaveLength(1)
+    w.net.down = false
+    expect(await s.getState().flush()).toBe(true)
+    expect(w.records.values().next().value.events).toHaveLength(1)
+  })
   it.each([false, true])('queues a connection-only question for the server, offline=%s', async offline => {
     const w = world(); let s = w.device()
     const original = w.client.offlinePack.getMockImplementation()

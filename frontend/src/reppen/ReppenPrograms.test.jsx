@@ -12,6 +12,7 @@ import { useStore } from '../store/useStore.js'
 import { reppenStore } from './connection.js'
 import ReppenPrograms from './ReppenPrograms.jsx'
 import { GZCLP, fakeClient } from './test-fixtures.js'
+import dorito from './dorito-fixture.json'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const mounted = []
@@ -40,6 +41,29 @@ beforeEach(() => {
 afterEach(() => { act(() => { mounted.splice(0).forEach(r => r.unmount()) }); document.body.innerHTML = '' })
 
 describe('Reppen programs screen', () => {
+  it('collects 44 lb values, requires explicit confirmation, and displays the saved setup on retry', async () => {
+    client.catalog = vi.fn(async () => ({ items: [dorito] }))
+    client.enroll.mockRejectedValue({ code: 'offline' })
+    const host = await render()
+    await act(async () => host.querySelector('button.lrow').click())
+    const fields = [...host.querySelectorAll('.rp-setup input')]
+    expect(fields).toHaveLength(44)
+    expect(fields.filter(i => !i.value)).toHaveLength(26)
+    expect(host.textContent).toContain('each hand')
+    expect(host.textContent).not.toContain('custom:opengym')
+    expect(button(host, 'Enroll').disabled).toBe(true)
+    await act(async () => fields.forEach(i => { if (!i.value) type(i, '5') }))
+    expect(button(host, 'Enroll').disabled).toBe(true)
+    await act(async () => host.querySelector('input[type=checkbox]').click())
+    expect(button(host, 'Enroll').disabled).toBe(false)
+    await act(async () => type(fields[0], '135'))
+    expect(button(host, 'Enroll').disabled).toBe(true)
+    await act(async () => host.querySelector('input[type=checkbox]').click())
+    await act(async () => button(host, 'Enroll').click())
+    expect(fields.every(i => i.disabled)).toBe(true)
+    await act(async () => button(host, 'Try again').click())
+    expect(client.enroll.mock.calls[1]).toEqual(client.enroll.mock.calls[0])
+  })
   it('is not there on an instance without Reppen', async () => {
     useStore.setState({ config: {} })
     const host = await render()

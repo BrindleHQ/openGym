@@ -1,5 +1,6 @@
 // Spanish UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Confirm starting weights and equipment increments in lb (dumbbells per hand).': 'Confirma los pesos iniciales y los incrementos del equipo en lb (mancuernas por mano).',
   'Confirm': 'Confirmar',
   'Cancel': 'Cancelar',
   'Press back again to exit': 'Pulsa atrás otra vez para salir',

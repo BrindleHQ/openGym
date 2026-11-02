@@ -26,3 +26,6 @@
 .reppen .rp-draft{flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--label-2)}
 .reppen .rp-draft>span{flex:1 1 100%}
 .reppen .rp-draft .btn{width:auto;flex:1}
+.reppen .rp-setup{border:0;padding:12px 0;margin:8px 0;display:flex;gap:12px;flex-wrap:wrap}
+.reppen .rp-setup legend{font-weight:600;max-width:100%}
+.reppen .rp-setup .measure-field{flex:1 1 140px;min-width:0}

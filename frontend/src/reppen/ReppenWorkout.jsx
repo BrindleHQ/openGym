@@ -105,11 +105,20 @@ export default function ReppenWorkout() {
   const rejected = useReppen(s => s.rejected)
   const error = useReppen(s => s.error)
   const busy = useReppen(s => s.busy)
+  const offline = useReppen(s => s.offline)
   const finished = useReppen(s => s.finished)
   const local = useReppen(s => s.local)
   const held = useReppen(s => s.held)
   const [loaded, setLoaded] = useState(false)
+  const [disconnected, setDisconnected] = useState(() => globalThis.navigator?.onLine === false)
   const ok = reppenAvailable(config, user)
+
+  useEffect(() => {
+    const update = () => setDisconnected(navigator.onLine === false)
+    window.addEventListener('online', update)
+    window.addEventListener('offline', update)
+    return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update) }
+  }, [])
 
   useEffect(() => {
     if (!ok) return
@@ -173,10 +182,10 @@ export default function ReppenWorkout() {
     {questions.map(q => <Question key={q.occurrence} q={q} />)}
     {(plan?.slots || []).map(slot => <SlotCard key={workout.workoutId + ':' + slot.slot} slot={slot} logged={logged} drafts={drafts} unit={unit} disabled={busy} />)}
     {workout && <div className="rp-finish">
-      <Button variant="filled" disabled={busy || questions.length > 0 || (outbox.length > 0 && !canFinishOffline)}
+      <Button variant="filled" disabled={busy || questions.length > 0 || ((disconnected || offline || outbox.length > 0) && !canFinishOffline)}
         onClick={async () => { await actions().finish() }}>{t('Finish workout')}</Button>
       {questions.length > 0 && <p className="sect-f">{t('Answer the open questions before finishing.')}</p>}
-      {outbox.length > 0 && !canFinishOffline && <p className="sect-f">{t('Connect to finish this workout. Your entries are saved on this device.')}</p>}
+      {(disconnected || offline || outbox.length > 0) && !canFinishOffline && <p className="sect-f">{t('Connect to finish this workout. Your entries are saved on this device.')}</p>}
     </div>}
   </div>
 }
