@@ -67,6 +67,12 @@ test('with the feature off every /api/reppen route is a 404 and no key file is m
   assert.equal((await h.jwks()).status, 404);
   assert.equal((await h.mint(browser(USER.id))).status, 404);
   assert.equal(fs.existsSync(path.join(h.dataDir, 'reppen-keys.json')), false);
+  assert.equal('reppen' in await fetch(`${h.api}/api/config`).then(r => r.json()), false, 'the app is not told about Reppen');
+});
+
+test('with the feature on /api/config says so, before anyone signs in', async t => {
+  const h = await startServer(t, { env: ON });
+  assert.equal((await fetch(`${h.api}/api/config`).then(r => r.json())).reppen, true);
 });
 
 test('a signed-in session gets a token that verifies with the published key and carries exactly the contract claims', async t => {
