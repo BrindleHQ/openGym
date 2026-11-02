@@ -32,6 +32,7 @@ import {
 } from './passkeys-store.js';
 import { createDeviceLink, findDeviceLink, burnDeviceLink, dropDeviceLinks, recoveryLinkOf, RECOVERY_TTL_MS } from './device-link.js';
 import { startAdminSocket } from './admin-socket.js';
+import { reppenConfig, openKeyStore, DEFAULT_LEAD_S, MAX_LEAD_S } from './reppen.js';
 import { createMediaStore, mediaLimits, mediaConfig, MediaError, HASH_RE } from './media.js';
 import { effectiveRoutineId } from './queue.js';
 import { stampPut } from './sync-stamps.js';
@@ -110,12 +111,18 @@ fs.mkdirSync(DATA, { recursive: true });
  * reason to refuse to boot. The privilege drop in adapters/spawn.js is the control that does
  * fail closed. */
 const lock = f => { try { fs.chmodSync(path.join(DATA, f), 0o600); } catch { /* not present yet, or host says no */ } };
-['secret', 'db.json', 'coach.json'].forEach(lock);
+['secret', 'db.json', 'coach.json', 'reppen-keys.json'].forEach(lock);
 
 /* ---------- secret + db ---------- */
 const secretFile = path.join(DATA, 'secret');
 if (!fs.existsSync(secretFile)) fs.writeFileSync(secretFile, crypto.randomBytes(32).toString('hex'), { mode: 0o600 });
 const SECRET = fs.readFileSync(secretFile, 'utf8').trim();
+
+// Reppen access tokens (reppen.js). Off unless both REPPEN_TOKEN_ISSUER and REPPEN_TOKEN_AUDIENCE
+// are set: then the /api/reppen/* routes exist and the key set is made on first start. Off, the
+// routes answer 404 like any unknown path and no key file appears.
+const REPPEN = reppenConfig();
+const reppenKeys = REPPEN.enabled ? openKeyStore(path.join(DATA, 'reppen-keys.json')) : null;
 
 const dbFile = path.join(DATA, 'db.json');
 // Every account, passkey and invite. Only a missing file starts empty: an unreadable one (a write
@@ -1390,6 +1397,20 @@ function removeAccount(u) {
   saveDb();
 }
 
+// The Reppen token routes (reppen.js), present only with the feature on. The key set is public.
+// A token is minted for the session that asks, cookie or paired phone's Bearer, behind the same
+// origin check as every other POST (csrfOk): a page elsewhere must not get a token in a signed-in
+// visitor's name. A session the account has signed out everywhere no longer verifies, so it gets
+// none. Not audited: the app asks for one every few minutes.
+const reppenRoutes = {
+  'GET /api/reppen/jwks': async (req, res) => json(res, 200, reppenKeys.jwks()),
+  'POST /api/reppen/token': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    json(res, 200, reppenKeys.mint(user.id, REPPEN));
+  },
+};
+
 const passwordRoutes = {
   'POST /api/login/password': async (req, res) => {
     const body = await readBody(req);
@@ -2419,6 +2440,7 @@ const routes = {
 
   // Absent entirely while PASSWORD_LOGIN is off, so each of them is a plain 404.
   ...(PASSWORD_LOGIN ? passwordRoutes : {}),
+  ...(REPPEN.enabled ? reppenRoutes : {}),
 
   // Always there: more passkeys and device links need nothing an instance has to switch on.
   ...passkeyRoutes,
@@ -3073,6 +3095,7 @@ server.listen(PORT, () => console.log(`gym-api on :${server.address().port} (rpI
 const CLI_REQ = { headers: {}, socket: {} };
 startAdminSocket({
   handle: async msg => {
+    if (msg?.cmd === 'reppen-keys') return reppenKeysCommand(msg);
     if (!msg || msg.cmd !== 'recover') return { error: 'unknown command' };
     const id = typeof msg.id === 'string' ? msg.id : null;
     const k = nameKey(typeof msg.name === 'string' ? msg.name : '');
@@ -3086,3 +3109,16 @@ startAdminSocket({
     return { ...row(u), code, expires: link.exp };
   }
 });
+
+// reppen-keys.js: the Reppen key set without its private halves, and rotation (reppen.js).
+function reppenKeysCommand(msg) {
+  if (!reppenKeys) return { error: 'Reppen tokens are off: set REPPEN_TOKEN_ISSUER and REPPEN_TOKEN_AUDIENCE' };
+  if (msg.rotate) {
+    const lead = msg.lead === undefined ? DEFAULT_LEAD_S : msg.lead;
+    if (!Number.isInteger(lead) || lead < 0 || lead > MAX_LEAD_S) return { error: `--lead takes whole seconds, 0 to ${MAX_LEAD_S}` };
+    const r = reppenKeys.rotate(lead);
+    if (r.error) return r;
+    console.log(`reppen: new signing key ${r.kid}, signs from ${new Date(r.activeFrom).toISOString()}`);
+  }
+  return { keys: reppenKeys.list() };
+}

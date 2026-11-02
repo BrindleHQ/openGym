@@ -262,6 +262,27 @@ admin to issue the first invite, so it needs one release deployed with `--bootst
 created becomes the admin (`FIRST_USER_ADMIN=1`). Create the owner profile at once, then roll back
 to the release before it.
 
+## Reppen access tokens
+
+OpenGym signs people in to the self-hosted Reppen service. Set `REPPEN_TOKEN_ISSUER` (this
+instance's public origin) and `REPPEN_TOKEN_AUDIENCE` (`reppen-staging` or `reppen-production`)
+to turn it on; without both, `/api/reppen/*` answers 404. `deploy/coolify-compose.yml` does not pass
+these variables yet, so staging and production run with the feature off until the Reppen deployment
+change adds them per environment. The app gets a five-minute token from
+`POST /api/reppen/token`, and Reppen verifies it with the keys at `GET /api/reppen/jwks`. The
+signing keys are made on first start in `/data/reppen-keys.json` (0600), separate per environment
+like the rest of `/data`, and are in the backup with it.
+
+Rotate a key from inside the API container:
+
+```sh
+node reppen-keys.js                    # list: signing, waiting, published, retired
+node reppen-keys.js rotate             # new key published now, signing in 10 minutes
+node reppen-keys.js rotate --lead 0    # signing now: only if Reppen refetches on an unknown kid
+```
+
+The previous key stays published until its last token has expired.
+
 ## Security boundaries
 
 - Pull requests, including ones from forks, run only on GitHub-hosted runners, with a read-only

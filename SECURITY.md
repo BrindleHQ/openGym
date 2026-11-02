@@ -175,6 +175,13 @@ Read this before hosting openGym for anyone other than yourself.
   one on the user record (`sessionVersion`, `sessionOf`), so every cookie ever
   issued for the account (on every device, including a copy someone walked off with) stops
   verifying at once. Passkeys are untouched; signing back in works immediately.
+- **Reppen access tokens have their own key and a five-minute life.** Only with
+  `REPPEN_TOKEN_ISSUER` and `REPPEN_TOKEN_AUDIENCE` set, `POST /api/reppen/token` mints an
+  Ed25519-signed JWT for the caller's session, behind the same origin check as every other POST.
+  The signing keys are never the session secret; they live in `reppen-keys.json` (0600) and are
+  never logged, and only their public halves are served (`GET /api/reppen/jwks`). A session that
+  no longer verifies (signed out everywhere, disabled) gets no token; one already issued stays
+  valid until its `exp`, at most five minutes (`api/reppen.js`).
 - **Data is isolated per user by the session's uid.** `GET`/`PUT /api/data` only ever touch
   `state-<uid>.json` for the caller (both resolve it with `readSession`); no route lets a normal
   user name another user.

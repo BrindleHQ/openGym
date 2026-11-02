@@ -579,6 +579,75 @@ paths:
               schema: { $ref: '#/components/schemas/Ok' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /api/reppen/jwks:
+    get:
+      tags: [auth]
+      operationId: reppenJwks
+      summary: Public keys for Reppen access tokens
+      description: |
+        The JWKS a Reppen service verifies this instance's access tokens against: Ed25519
+        keys (`kty: OKP`, `alg: EdDSA`, `use: sig`), each with its `kid`. A new key is
+        listed before it signs anything; an old one stays until its last token has
+        expired. Exists only while both `REPPEN_TOKEN_ISSUER` and `REPPEN_TOKEN_AUDIENCE`
+        are set; otherwise `404`.
+      security: []
+      responses:
+        '200':
+          description: The published keys.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [keys]
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      type: object
+                      required: [kty, crv, x, kid, alg, use]
+                      properties:
+                        kty: { const: OKP }
+                        crv: { const: Ed25519 }
+                        x: { type: string, description: The public key, base64url. }
+                        kid: { type: string }
+                        alg: { const: EdDSA }
+                        use: { const: sig }
+        '404': { description: Reppen tokens are off on this instance. }
+
+  /api/reppen/token:
+    post:
+      tags: [auth]
+      operationId: reppenToken
+      summary: Mint a Reppen access token for this session
+      description: |
+        A five-minute EdDSA JWT for the signed-in account (cookie, or the paired phone's
+        Bearer), to send to Reppen as `Authorization: Bearer <token>`. Header
+        `{"alg":"EdDSA","typ":"JWT","kid":…}`; claims `iss` (`REPPEN_TOKEN_ISSUER`), `aud`
+        (`REPPEN_TOKEN_AUDIENCE`), `sub` (the account id), `iat`, `nbf` (= `iat`) and `exp`
+        (= `iat` + 300). Behind the same origin check as every other POST (see *CSRF*).
+        After `/api/logout/all` the earlier sessions get `401`; tokens already issued
+        stay valid until their `exp`. Exists only while both `REPPEN_TOKEN_ISSUER` and
+        `REPPEN_TOKEN_AUDIENCE` are set; otherwise `404`.
+      responses:
+        '200':
+          description: The token and when it expires.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, expiresAt]
+                properties:
+                  token: { type: string }
+                  expiresAt: { type: integer, description: The token's `exp`, in epoch seconds. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: A browser request from another origin (see *CSRF*).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: "cross-origin request refused", code: "origin-mismatch", expected: "https://gym.example.com" }
+        '404': { description: Reppen tokens are off on this instance. }
+
   /api/account/delete:
     post:
       tags: [auth]
