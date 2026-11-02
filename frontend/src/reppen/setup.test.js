@@ -16,6 +16,35 @@ function world() {
   return { client, device, midnight: () => { day = '2026-11-03' } }
 }
 describe('Dorito required setup', () => {
+  it('retains the same enrollment across snapshot quota failure, reload and a lost response', async () => {
+    const client = fakeClient(), kept = new Map()
+    let quota = true, day = '2026-11-02'
+    const storage = { getItem: k => kept.get(k) ?? null, setItem(k, v) {
+      if (quota && k.startsWith('reppen.offline.') && JSON.parse(v).data.local.pendingEnrollment) throw Error('snapshot quota')
+      kept.set(k, v)
+    } }
+    const device = () => {
+      const s = createReppenStore({ client, storage, owner: () => 'one', today: () => day })
+      s.getState().hydrate(); return s
+    }
+    let s = device()
+    expect(await s.getState().enroll(entry, {}, filled(), true)).toBe(false)
+    expect(client.enroll).not.toHaveBeenCalled()
+    expect(s.getState().error.code).toBe('enrollmentStorage')
+    const pending = JSON.parse(kept.get('reppen.v1.one')).pendingEnrollment
+    expect(pending).toBeTruthy()
+    expect(JSON.parse(kept.get('reppen.offline.v1.one')).data.local.pendingEnrollment).toBeFalsy()
+    s.getState()._disposeOffline(); s = device()
+    expect(s.getState().local.pendingEnrollment).toEqual(pending)
+    quota = false; day = '2026-11-03'
+    client.enroll.mockRejectedValueOnce(new ReppenError(0))
+    expect(await s.getState().enroll(entry, {}, {}, false)).toBe(false)
+    expect(client.enroll.mock.calls[0]).toEqual([pending.enrollmentId, pending.body])
+    s.getState()._disposeOffline(); s = device()
+    expect(await s.getState().enroll(entry, {}, {}, false)).toBe(true)
+    expect(client.enroll.mock.calls[1]).toEqual(client.enroll.mock.calls[0])
+    expect(s.getState().local.pendingEnrollment).toBeNull()
+  })
   it('never sends an enrollment if its exact retry request cannot be retained', async () => {
     const client = fakeClient()
     const kept = new Map()

@@ -122,6 +122,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         const bytes = JSON.stringify(local)
         storage.setItem(KEY(who), bytes)
         if (durable && storage.getItem(KEY(who)) !== bytes) throw Error('Storage did not retain enrollment')
+        if (durable) get()._persistLocal(local)
       } catch (e) { if (durable) throw e /* other pointers may remain in memory in private mode */ }
       set({ local, localOwner: who })
     }

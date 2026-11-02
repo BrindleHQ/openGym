@@ -106,8 +106,11 @@ export function withOfflineQueue(store, { client, owner, storage, today, newId, 
       if (saved && (saved.version !== 1 || saved.owner !== account || !saved.data || !Array.isArray(saved.data.outbox) || !Array.isArray(saved.data.offlineJournal))) throw Error('Invalid offline journal')
     } catch { unreadable = true; persistError = fault('offlineStorage', 'Saved offline work could not be read. Keep this device open and recover it before continuing.'); saved = null }
     base.hydrate()
+    // Enrollment requests are verified in the base journal before HTTP. A failed
+    // snapshot write must not replace that retained request with an older copy.
+    const pendingEnrollment = store.getState().local.pendingEnrollment
     store.setState(empty)
-    if (saved) store.setState(saved.data)
+    if (saved) store.setState({ ...saved.data, local: { ...saved.data.local, pendingEnrollment } })
     base._rememberPending(store.getState().outbox, store.getState().workout?.revision || 0)
     loading = false
     const generation = epoch
@@ -342,6 +345,7 @@ export function withOfflineQueue(store, { client, owner, storage, today, newId, 
     discardDraft(draft) { try { commit({ rejected: withoutDraft(store.getState().rejected, draft) }) } catch (e) { report(e) } },
     dismissRejected() { try { const s = store.getState(); commit({ rejected: s.workout ? s.rejected.filter(r => r.code === 'setTaken') : [] }) } catch (e) { report(e) } },
     answer(question, choice) { return enqueue({ kind: 'questionAnswered', question: question.id || question.question, occurrence: question.occurrence, value: choice.value }) },
+    _persistLocal(local) { write({ local }) },
     async enroll(...args) {
       try {
         await ensure()
