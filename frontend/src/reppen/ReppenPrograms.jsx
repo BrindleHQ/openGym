@@ -7,7 +7,7 @@ import { t } from '../lib/i18n.js'
 import Icon from '../components/Icon.jsx'
 import { Button, NumberField, Row, Section, Segmented, SelectRow } from '../components/ui.jsx'
 import { reppenAvailable, reppenStore, useReppen } from './connection.js'
-import { massReadings, unaskedParameters } from './store.js'
+import { exerciseName, massReadings, unaskedParameters } from './store.js'
 import { errorText } from './messages.js'
 import { fmtDate } from '../lib/format.js'
 import './reppen.css'
@@ -29,6 +29,7 @@ function EnrollForm({ entry, replaces, onDone }) {
   const busy = useReppen(s => s.busy)
   const pending = useReppen(s => s.local.pendingEnrollment)
   const retry = pending?.artifactId === entry.artifactId
+  const names = useReppen(s => s.exerciseNames)
   const readings = massReadings(entry)
   const [kg, setKg] = useState({})
   const blocked = cannotEnroll(entry)
@@ -38,11 +39,17 @@ function EnrollForm({ entry, replaces, onDone }) {
     <h2>{entry.title}</h2>
     {readings.length > 0 && <p className="sect-f">{t('Enter your current numbers. The program sets your first weights from them.')}</p>}
     {retry && <p className="sect-f">{t('Retrying confirms the original enrollment request and readings.')}</p>}
-    {readings.map((r, i) => <label key={i} className="row between reppen-reading">
-      <span><span>{readingLabel(r)}</span> <span className="sub">{r.key}</span></span>
-      <span className="row"><NumberField value={(retry ? pending.kgByReading?.[i] : kg[i]) ?? null} disabled={retry} nullable aria-label={readingLabel(r) + ' ' + (r.key || '')}
-        onChange={v => setKg(prev => ({ ...prev, [i]: v }))} /> kg</span>
-    </label>)}
+    {readings.length > 0 && <div className="measure-form rp-readings">
+      {readings.map((r, i) => <label key={i} className="measure-field rp-reading" data-key={r.key}>
+        <span>{r.key ? exerciseName(names, r.key) : readingLabel(r)}</span>
+        <span className="measure-input">
+          <NumberField value={(retry ? pending.kgByReading?.[i] : kg[i]) ?? null} disabled={retry} nullable aria-label={readingLabel(r) + (r.key ? ' ' + exerciseName(names, r.key) : '')}
+            onChange={v => setKg(prev => ({ ...prev, [i]: v }))} />
+          <i>kg</i>
+        </span>
+        {r.key && <span className="rp-t">{readingLabel(r)}</span>}
+      </label>)}
+    </div>}
     {blocked && <p className="sect-f" role="alert">{blocked}</p>}
     {replaces && <p className="sect-f">{t('This replaces {0} in this app.', replaces)}</p>}
     <div className="row" style={{ gap: 8, marginTop: 10 }}>
@@ -106,6 +113,7 @@ export default function ReppenPrograms() {
   useEffect(() => {
     if (!ok) return
     actions().hydrate()
+    actions().loadExerciseNames()
     actions().loadCatalog()
     actions().loadEnrollment()
     actions().loadHistory()

@@ -71,6 +71,21 @@ describe('Reppen programs screen', () => {
     expect(JSON.parse(localStorage.getItem('reppen.v1.u1')).nextDay).toBe('B2')
   })
 
+  it('labels each reading with the exercise name, and its id when the catalog has none', async () => {
+    const host = await render()
+    await settle()
+    reppenStore.setState({ exerciseNames: { 'wger:111': 'Barbell Back Squat' } })
+    await act(async () => [...host.querySelectorAll('button.lrow')][0].click())
+    const fields = [...host.querySelectorAll('.reppen-enroll .measure-field')]
+    expect(fields.map(f => f.querySelector('span').textContent)).toEqual(['Barbell Back Squat', 'wger:192'])
+    // The app's own measurement field: the number and its unit in one box, what is asked under it.
+    expect(fields[0].querySelector('.measure-input input.num')).toBeTruthy()
+    expect(fields[0].querySelector('.measure-input i').textContent).toBe('kg')
+    expect(fields[0].querySelector('.rp-t').textContent).toBe('Estimated one-rep max')
+    expect(fields[0].querySelector('input').getAttribute('aria-label')).toBe('Estimated one-rep max Barbell Back Squat')
+    expect(host.querySelector('.reppen-enroll').textContent).not.toContain('wger:111')
+  })
+
   it('says what went wrong when Reppen cannot be reached', async () => {
     const { ReppenError } = await import('./client.js')
     client.catalog = vi.fn(async () => { throw new ReppenError(0, null) })
