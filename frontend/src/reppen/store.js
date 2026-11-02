@@ -49,6 +49,12 @@ export const unaskedParameters = entry => (entry?.parameters || []).filter(p => 
 export const emptyParams = entry => Object.fromEntries((entry?.parameters || []).filter(p => p?.type?.t === 'opt')
   .map(p => [p.name, { v: 'none', cause: { k: 'declaredNone' } }]))
 
+// A workout Reppen stored but holds back because another one is active: the same choice a start
+// that ran into it offers (activeWorkoutExists), read from the workout itself, so it survives a reload.
+const heldBy = view => (view && view.active === false && view.activeWorkout
+  ? { active: view.activeWorkout, held: { workoutId: view.workoutId, day: view.day, eventCount: view.eventCount } }
+  : null)
+
 function readLocal(storage, owner) {
   try { return JSON.parse(storage.getItem(KEY(owner))) || {} } catch { return {} }
 }
@@ -92,7 +98,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         rejected: [...get().rejected, ...get().outbox.filter(event => !accepted.has(event.id)).map(event => ({ workoutId: id, event, code: 'workoutFinished' }))] })
     }
     function enqueue(event) {
-      if (!get().workout) return Promise.resolve()
+      if (!get().workout || get().busy) return Promise.resolve()
       set({ outbox: [...get().outbox, { id: newId(), ...event }] })
       return get().flush()
     }
@@ -236,6 +242,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
               return false
             }
             adoptWorkout(view)
+            set({ held: heldBy(view) })
             return true
           } catch (e) {
             // Another workout holds the active place (another device, a lost pointer): this one is
@@ -250,22 +257,23 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       /** After a start found another active workout: carry on with that one. */
       async continueActive() {
         const active = get().held?.active?.workoutId
-        if (!active) return
+        if (!active) return false
         save({ workoutId: active })
         set({ held: null })
-        await get().resume()
+        return !!(await get().resume())
       },
 
       /** After a start found another active workout: make the new one active in its place. */
       async continueHeld() {
         const { held } = get()
-        if (!held?.held?.workoutId) return
+        if (!held?.held?.workoutId) return false
         try {
           const view = await client.activate(held.held.workoutId, held.active?.workoutId ?? null)
           save({ workoutId: view.workoutId })
           adoptWorkout(view)
           set({ held: null, error: null })
-        } catch (e) { set({ error: e }) }
+          return true
+        } catch (e) { set({ error: e }); return false }
       },
 
       /** Fetches the workout in progress; forgets it once it is finished or gone. */
@@ -277,7 +285,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
           if (get().local.workoutId !== id) return null
           if (view.status === 'completed') { completedWorkout(id, null, view.events); return null }
           adoptWorkout(view)
-          set({ error: null })
+          set({ held: heldBy(view) })
           return view
         } catch (e) {
           if (e.code === 'workoutNotFound') { save({ workoutId: null }); set({ workout: null }) }
@@ -289,7 +297,10 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       logSet(slot, step, index, values) { return enqueue({ kind: 'setLogged', slot, step, set: index, values }) },
       clearSet(slot, step, index) { return enqueue({ kind: 'setCleared', slot, step, set: index }) },
       /** `question` is one of the workout's pendingQuestions; the occurrence goes back as Reppen sent it. */
-      answer(question, choice) { return enqueue({ kind: 'questionAnswered', question: question.id, occurrence: question.occurrence, value: choice.value }) },
+      answer(question, choice) {
+        if (get().outbox.some(e => e.kind === 'questionAnswered' && e.question === question.id && e.occurrence === question.occurrence)) return Promise.resolve()
+        return enqueue({ kind: 'questionAnswered', question: question.id, occurrence: question.occurrence, value: choice.value })
+      },
       dismissRejected() { set({ rejected: [] }) },
 
       /** All callers for this workout wait for the same draining run. */
@@ -352,7 +363,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       },
 
       async loadHistory() {
-        try { set({ history: (await client.history()).items || [], error: null }) }
+        try { set({ history: (await client.history()).items || [] }) }
         catch (e) { set({ error: e }) }
       },
     }
