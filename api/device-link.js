@@ -21,7 +21,7 @@ import crypto from 'node:crypto';
 
 // Long enough to walk to the other device, find the camera and sign in; short enough that a code
 // photographed off a screen is dead by the time anyone could use it.
-export const DEVICE_LINK_TTL_MS = 10 * 60 * 1000;
+export const DEVICE_LINK_TTL_MS = 10 * 60_000;
 // A recovery code is handed over by an admin, by message or in person: a day, like a reset code.
 export const RECOVERY_TTL_MS = 24 * 3600 * 1000;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
