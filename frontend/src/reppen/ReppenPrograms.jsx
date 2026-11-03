@@ -46,7 +46,7 @@ function EnrollForm({ entry, replaces, onDone }) {
     {blocked && <p className="sect-f" role="alert">{blocked}</p>}
     {replaces && <p className="sect-f">{t('This replaces {0} in this app.', replaces)}</p>}
     <div className="row" style={{ gap: 8, marginTop: 10 }}>
-      <Button variant="filled" disabled={!!blocked || missing || busy} onClick={submit}>{t(retry ? 'Retry' : 'Enroll')}</Button>
+      <Button variant="filled" disabled={!!blocked || missing || busy} onClick={submit}>{retry ? t('Try again') : t('Enroll')}</Button>
       <Button onClick={onDone}>{t('Cancel')}</Button>
     </div>
   </div>

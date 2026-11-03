@@ -126,7 +126,7 @@ describe('Reppen programs screen', () => {
     await act(async () => button(host, 'Enroll').click())
     expect(host.textContent).toContain('Retrying confirms the original enrollment request and readings.')
     expect([...host.querySelectorAll('.reppen-enroll input')].map(i => [i.value, i.disabled])).toEqual([['140', true], ['100', true]])
-    await act(async () => button(host, 'Retry').click())
+    await act(async () => button(host, 'Try again').click())
     expect(client.enroll.mock.calls[1]).toEqual(client.enroll.mock.calls[0])
     expect(host.querySelector('.reppen-enroll')).toBe(null)
   })
