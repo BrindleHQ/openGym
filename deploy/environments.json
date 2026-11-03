@@ -9,7 +9,7 @@
     "allowGuest": false,
     "backupCron": "17 3 * * *",
     "backupRetentionDays": 7,
-    "reppen": { "enabled": true, "image": "sha256:5aea4ca151d8facb7032e9b57ac1656c1b3fd20a45c53babe86a243d784588d2" }
+    "reppen": { "enabled": true, "image": "sha256:f233de3e796de35d95e68368ad64a1b26335876d25fff35082f1cf572fcff948" }
   },
   "production": {
     "exposure": "tailnet",
@@ -21,6 +21,6 @@
     "allowGuest": false,
     "backupCron": "47 2 * * *",
     "backupRetentionDays": 30,
-    "reppen": { "enabled": true, "image": "sha256:5aea4ca151d8facb7032e9b57ac1656c1b3fd20a45c53babe86a243d784588d2" }
+    "reppen": { "enabled": true, "image": "sha256:f233de3e796de35d95e68368ad64a1b26335876d25fff35082f1cf572fcff948" }
   }
 }

@@ -30,6 +30,13 @@ export function offlineProjection(s) {
     || (nodeIndex === 0 && (envelope.workoutId !== s.workout.workoutId || envelope.workoutRevision > s.workout.revision))) return null
   const node = envelope.pack?.nodes?.[nodeIndex]
   if (!node) return null
+  // Guided setup has no offline transition adapter. Its trial, baseline and
+  // equipment events change the authoritative effective plan, even when the
+  // residual pack still carries the earlier prescription. Never overwrite an
+  // acknowledged setup result by projecting that older plan. Events still queue
+  // durably; working sets remain loggable at their last confirmed targets.
+  if (node.plan?.slots?.some(slot => slot.setup)
+    || (s.workout.effectivePlan || s.workout.plan)?.slots?.some(slot => slot.setup)) return null
   const events = eventsOf(s), basis = nodeIndex === 0 ? envelope.workoutRevision : 0
   const questions = createOfflineQuestions(node.plan, node.targets, node.occurrences)
   for (let i = basis; i < events.length; i++) {
@@ -351,6 +358,9 @@ export function withOfflineQueue(store, { client, owner, storage, today, newId, 
       catch (e) { return { finish: { k: 'needsConnection', reason: e.message } } }
     },
     logSet(slot, step, set, values) { return enqueue({ kind: 'setLogged', slot, step, set, values }) },
+    logLoadTrial(slot, loadKg, reps, feedback) { return enqueue({ kind: 'loadTrial', slot, loadKg, reps, feedback }) },
+    confirmStartingLoad(slot, loadKg, source) { return enqueue({ kind: 'startingLoadConfirmed', slot, loadKg, source }) },
+    confirmEquipment(slot, nextLoadKg, incrementKg) { return enqueue({ kind: 'equipmentConfirmed', slot, nextLoadKg, ...(incrementKg != null ? { incrementKg } : {}) }) },
     clearSet(slot, step, set) { return enqueue({ kind: 'setCleared', slot, step, set }) },
     relogDraft(draft) { const { id, ...event } = draft.event; return enqueue(event, draft) },
     discardDraft(draft) { try { commit({ rejected: withoutDraft(store.getState().rejected, draft) }) } catch (e) { report(e) } },

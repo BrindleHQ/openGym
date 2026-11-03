@@ -95,6 +95,7 @@ export function reppenClient({ base, token, fetch: doFetch = (...a) => globalThi
     exerciseCatalog: (etag = null) => authed(bearer => send('GET', 'exercise-catalog', undefined, bearer,
       { catalog: true, headers: etag ? { 'If-None-Match': etag } : {}, cache: 'no-store' })),
     enrollment: id => call('GET', 'enrollments/' + seg(id)),
+    enrollments: () => call('GET', 'enrollments?limit=2'),
     /** @param {{ artifactId: string, startOn: string, params?: object, readings?: object[] }} body */
     enroll: (id, body) => call('PUT', 'enrollments/' + seg(id), body),
     workout: id => call('GET', 'workouts/' + seg(id)),

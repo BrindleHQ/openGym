@@ -10,7 +10,7 @@ vi.mock('react-router-dom', () => ({ useNavigate: () => navSpy, Navigate: ({ to 
 
 import { useStore } from '../store/useStore.js'
 import { reppenStore } from './connection.js'
-import ReppenPrograms from './ReppenPrograms.jsx'
+import ReppenPrograms, { availablePrograms } from './ReppenPrograms.jsx'
 import { GZCLP, fakeClient } from './test-fixtures.js'
 import dorito from './dorito-fixture.json'
 
@@ -41,6 +41,47 @@ beforeEach(() => {
 afterEach(() => { act(() => { mounted.splice(0).forEach(r => r.unmount()) }); document.body.innerHTML = '' })
 
 describe('Reppen programs screen', () => {
+  it('offers the latest program revision while keeping an older pending enrollment retry reachable', () => {
+    const old = { ...dorito, revision: 1 }, current = { ...dorito, artifactId: 'new', revision: 2 }
+    expect(availablePrograms([old, current])).toEqual([current])
+    expect(availablePrograms([old, current], old.artifactId)).toEqual([old, current])
+  })
+  it('asks for a day instead of defaulting an advanced recovered enrollment to day A', async () => {
+    client.enrollments.mockResolvedValue({ items: [{ enrollmentId: 'server', artifactId: dorito.artifactId, title: dorito.title, days: dorito.days, defaultDay: 'A', nextDay: null, revision: 3 }], nextCursor: null })
+    const host = await render()
+    expect(host.textContent).toContain('Choose the day you want to train next.')
+    expect(host.textContent).not.toContain('Next workout: A')
+    expect(button(host, 'Start').disabled).toBe(true)
+  })
+  it('lets a beginner enroll with unknown weights without silently using program reference weights', async () => {
+    const guided = { ...dorito, parameters: dorito.parameters.map(p => ({ ...p, required: false, deferred: true, type: { t: 'opt', of: p.type } })) }
+    client.catalog = vi.fn(async () => ({ items: [guided] }))
+    const host = await render()
+    await act(async () => host.querySelector('button.lrow').click())
+    expect(host.querySelectorAll('.rp-setup input')).toHaveLength(0)
+    expect(host.textContent).toContain('You do not need to know your weights yet.')
+    expect(button(host, 'Enroll').disabled).toBe(false)
+    await act(async () => button(host, 'Enroll').click())
+    expect(Object.values(client.enroll.mock.calls[0][1].params).every(p => p.v === 'none')).toBe(true)
+  })
+  it('collects only the user’s known weights and requires confirmation', async () => {
+    const guided = { ...dorito, parameters: dorito.parameters.map(p => ({ ...p, required: false, deferred: true, type: { t: 'opt', of: p.type } })) }
+    client.catalog = vi.fn(async () => ({ items: [guided] }))
+    const host = await render()
+    await act(async () => host.querySelector('button.lrow').click())
+    await act(async () => button(host, 'I already know some weights').click())
+    expect([...host.querySelectorAll('.rp-setup input')].every(i => i.value === '')).toBe(true)
+    await act(async () => type(host.querySelectorAll('.rp-setup input')[1], '65'))
+    expect([...host.querySelectorAll('.rp-setup input')].filter(i => i.value)).toHaveLength(1)
+    expect(button(host, 'Enroll').disabled).toBe(true)
+    await act(async () => host.querySelector('input[type=checkbox]').click())
+    expect(button(host, 'Enroll').disabled).toBe(false)
+    await act(async () => button(host, 'Enroll').click())
+    const params = client.enroll.mock.calls[0][1].params
+    expect(params.b_press_starting_load.v).toBe('none')
+    expect(params.a_bench_increment.v).toBe('none')
+    expect(params.a_bench_starting_load.n).toBeCloseTo(65 * 0.45359237)
+  })
   it('collects 44 lb values, requires explicit confirmation, and displays the saved setup on retry', async () => {
     client.catalog = vi.fn(async () => ({ items: [dorito] }))
     client.enroll.mockRejectedValue({ code: 'offline' })

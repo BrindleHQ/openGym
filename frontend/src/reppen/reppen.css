@@ -30,3 +30,9 @@
 .reppen .rp-setup{border:0;padding:12px 0;margin:8px 0;display:flex;gap:12px;flex-wrap:wrap}
 .reppen .rp-setup legend{font-weight:600;max-width:100%}
 .reppen .rp-setup .measure-field{flex:1 1 140px;min-width:0}
+.reppen .rp-starting-weight{margin:12px 0;padding:12px;background:var(--surface-2);border-radius:12px}
+.reppen .rp-starting-weight h3{margin:0 0 8px}
+.reppen .rp-setup-actions,.reppen .rp-setup-inputs{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.reppen .rp-setup-inputs .measure-field{flex:1 1 120px;min-width:0}
+.reppen .rp-starting-weight .num{max-width:100%}
+.reppen .rp-trials{padding-inline-start:24px;font-size:13px;color:var(--label-2)}

@@ -11,12 +11,21 @@ import { exerciseName, massReadings, unaskedParameters } from './store.js'
 import { errorText } from './messages.js'
 import OfflineStatus from './OfflineStatus.jsx'
 import { fmtDate } from '../lib/format.js'
-import { massParameters, initialSetup, validSetup, positive } from './setup.js'
+import { massParameters, initialSetup, validSetup, positive, guidedSetup } from './setup.js'
 import './reppen.css'
 
 const actions = () => reppenStore.getState()
 
 const readingLabel = r => (r.fact === 'e1rm' ? t('Estimated one-rep max') : r.fact)
+
+export function availablePrograms(catalog, pendingArtifact) {
+  const latest = new Map()
+  for (const entry of catalog || []) {
+    const key = entry.catalogId || entry.artifactId
+    if (!latest.has(key) || (entry.revision || 0) > (latest.get(key).revision || 0)) latest.set(key, entry)
+  }
+  return (catalog || []).filter(entry => latest.get(entry.catalogId || entry.artifactId) === entry || entry.artifactId === pendingArtifact)
+}
 
 // Why this form cannot enroll in `entry`, or null when it can.
 function cannotEnroll(entry) {
@@ -36,7 +45,10 @@ function EnrollForm({ entry, replaces, onDone }) {
   const [kg, setKg] = useState({})
   const [setup, setSetup] = useState(() => initialSetup(entry))
   const [confirmed, setConfirmed] = useState(false)
+  const [showKnown, setShowKnown] = useState(false)
   const parameters = massParameters(entry)
+  const guided = guidedSetup(entry)
+  const shownParameters = guided ? parameters.filter(p => p.purpose === 'startingLoad') : parameters
   const slots = [...new Set(parameters.map(p => p.slot))]
   const blocked = cannotEnroll(entry)
   const missing = !retry && (readings.some((r, i) => (r.required || kg[i] != null) && !positive(kg[i])) || !validSetup(entry, setup, confirmed))
@@ -44,18 +56,28 @@ function EnrollForm({ entry, replaces, onDone }) {
   return <div className="card reppen-enroll" data-catalog-id={entry.catalogId}>
     <h2>{entry.title}</h2>
     {readings.length > 0 && <p className="sect-f">{t('Enter your current numbers. The program sets your first weights from them.')}</p>}
+    {readings.some(r => r.required) && <p className="sect-f">{t('This program uses strength estimates to calculate weights. If you do not know them yet, choose a program with guided starting weights or establish these numbers before enrolling.')}</p>}
     {retry && <p className="sect-f">{t('Retrying confirms the original enrollment request and readings.')}</p>}
-    {slots.map(slot => <fieldset key={slot} className="rp-setup">
+    {guided && <>
+      <p>{t('You do not need to know your weights yet. We will help you find a starting weight when you reach each exercise.')}</p>
+      <p className="sect-f">{t('Equipment steps can wait until you are ready to increase a weight.')}</p>
+      <Button disabled={retry} onClick={() => setShowKnown(v => !v)}>{t('I already know some weights')}</Button>
+      {(showKnown || retry && Object.values(pending.setup || {}).some(positive)) && <>
+        <p className="sect-f">{t('Enter only weights you know. Leave the others blank. Dumbbell weights are per hand.')}</p>
+        <Button disabled={retry} onClick={() => { setSetup(initialSetup(entry)); setConfirmed(false); setShowKnown(false) }}>{t('Find all weights during workouts')}</Button>
+      </>}
+    </>}
+    {(!guided || showKnown || retry && Object.values(pending.setup || {}).some(positive)) && slots.map(slot => <fieldset key={slot} className="rp-setup">
       <legend>{t('Day {0}', slot.split('_')[0].toUpperCase())} · {parameters.find(p => p.slot === slot).exerciseName}</legend>
-      {parameters.filter(p => p.slot === slot).map(p => <label key={p.name} className="measure-field">
+      {shownParameters.filter(p => p.slot === slot).map(p => <label key={p.name} className="measure-field">
         <span>{p.purpose === 'startingLoad' ? t('Weight ({0})', 'lb') : t('Step ({0})', 'lb')}</span>
         <NumberField nullable value={(retry ? pending.setup?.[p.name] : setup[p.name]) ?? null} disabled={retry}
           aria-label={`${p.exerciseName} ${p.purpose === 'startingLoad' ? t('Weight ({0})', 'lb') : t('Step ({0})', 'lb')}`}
           onChange={v => { setSetup(prev => ({ ...prev, [p.name]: v })); setConfirmed(false) }} />
       </label>)}
     </fieldset>)}
-    {parameters.length > 0 && <label><input type="checkbox" checked={retry ? !!pending.confirmed : confirmed} disabled={retry}
-      onChange={e => setConfirmed(e.target.checked)} />{t('Confirm starting weights and equipment increments in lb (dumbbells per hand).')}</label>}
+    {parameters.length > 0 && (!guided || Object.values(retry ? pending.setup || {} : setup).some(v => v != null)) && <label><input type="checkbox" checked={retry ? !!pending.confirmed : confirmed} disabled={retry}
+      onChange={e => setConfirmed(e.target.checked)} />{guided ? t('These are my working weights in lb (dumbbells per hand).') : t('Confirm starting weights and equipment increments in lb (dumbbells per hand).')}</label>}
     {readings.length > 0 && <div className="measure-form rp-readings">
       {readings.map((r, i) => <label key={i} className="measure-field rp-reading" data-key={r.key}>
         <span>{r.key ? exerciseName(names, r.key) : readingLabel(r)}</span>
@@ -82,6 +104,7 @@ function NextWorkout({ enrollment, nextDay, workoutId, nav }) {
   const start = async () => { if (await actions().start(nextDay)) nav('/reppen/workout') }
   return <Section title={t('Your program')}>
     <Row icon="dumbbell" title={enrollment.title} subtitle={nextDay ? t('Next workout: {0}', nextDay) : null} />
+    {!nextDay && !workoutId && <p className="sect-f">{t('Choose the day you want to train next.')}</p>}
     {days.length > 1 && (days.length <= 4
       ? <div className="reppen-days"><Segmented value={nextDay} onChange={d => actions().chooseDay(d)} options={days.map(d => ({ value: d, label: d }))} /></div>
       : <SelectRow title={t('Day')} value={nextDay} onChange={d => actions().chooseDay(d)} options={days.map(d => ({ value: d, label: d }))} />)}
@@ -141,7 +164,7 @@ export default function ReppenPrograms() {
   if (!config && !ok) return null
   if (!ok) return <Navigate to="/plan" replace />
   const enrollment = local.enrollment
-  const nextDay = local.nextDay ?? enrollment?.defaultDay ?? null
+  const nextDay = Object.hasOwn(local, 'nextDay') ? local.nextDay : enrollment?.defaultDay ?? null
 
   return <div className="narrow reppen">
     <div className="hdr">
@@ -156,7 +179,7 @@ export default function ReppenPrograms() {
       ? <EnrollForm entry={picking} replaces={enrollment && enrollment.artifactId !== picking.artifactId ? enrollment.title : null} onDone={() => setPicking(null)} />
       : <Section title={t('Programs')} footer={catalog && !catalog.length ? t('No programs are published yet.') : null}>
         {!catalog && !catalogError && <Row title={t('Loading…')} />}
-        {(catalog || []).map(entry => <Row key={entry.artifactId} icon="list" title={entry.title}
+        {availablePrograms(catalog, local.pendingEnrollment?.artifactId).map(entry => <Row key={entry.artifactId} icon="list" title={entry.title}
           subtitle={t('{0} days', (entry.days || []).length)}
           accessory={enrollment?.artifactId === entry.artifactId ? 'check' : 'chevron'}
           onClick={enrollment?.artifactId === entry.artifactId ? undefined : () => setPicking(entry)} />)}
