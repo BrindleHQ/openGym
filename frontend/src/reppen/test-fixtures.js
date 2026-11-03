@@ -18,6 +18,7 @@ export function fakeClient(overrides = {}) {
     enrollment: vi.fn(async id => ({ enrollmentId: id, revision: 0 })),
     enroll: vi.fn(async (id, body) => ({ enrollmentId: id, artifactId: body.artifactId, revision: 0 })),
     history: vi.fn(async () => ({ items: [], nextCursor: null })),
+    exerciseCatalog: vi.fn(async () => ({ notModified: true })),
     ...overrides,
   }
 }

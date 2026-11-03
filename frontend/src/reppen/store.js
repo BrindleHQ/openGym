@@ -59,6 +59,34 @@ function readLocal(storage, owner) {
   try { return JSON.parse(storage.getItem(KEY(owner))) || {} } catch { return {} }
 }
 
+// The exercise names, kept with the ETag of the catalog they came from. One copy for every account:
+// the catalog is the same for all of them.
+const NAMES_KEY = 'reppen.exercise-names.v1'
+
+function readNames(storage) {
+  try {
+    const kept = JSON.parse(storage.getItem(NAMES_KEY))
+    return kept && kept.names && typeof kept.names === 'object' ? kept : null
+  } catch { return null }
+}
+
+/**
+ * Exercise id → display name, from a reppen.exercise-catalog/1 document; null for any other format.
+ * Retired entries keep their names, since programs keep their ids. Format 1 has names in English
+ * only and no other language fields.
+ */
+export function exerciseNames(catalog) {
+  if (catalog?.format !== 'reppen.exercise-catalog/1') return null
+  const names = {}
+  for (const e of [...(catalog.retired || []), ...(catalog.entries || [])]) {
+    if (e && typeof e.id === 'string' && typeof e.name === 'string' && e.name) names[e.id] = e.name
+  }
+  return names
+}
+
+/** The name to show for a Reppen exercise id: the catalog's, else the id itself. */
+export const exerciseName = (names, id) => names?.[id] || id
+
 /**
  * @param {{ client: ReturnType<import('./client.js').reppenClient>, owner: () => string|null|undefined,
  *   storage?: Storage, today: () => string }} deps
@@ -97,6 +125,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       set({ workout: null, outbox: [], error,
         rejected: [...get().rejected, ...get().outbox.filter(event => !accepted.has(event.id)).map(event => ({ workoutId: id, event, code: 'workoutFinished' }))] })
     }
+    let namesLoad = null
     function enqueue(event) {
       if (!get().workout || get().busy) return Promise.resolve()
       set({ outbox: [...get().outbox, { id: newId(), ...event }] })
@@ -142,6 +171,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       finished: null,         // the finish answer of the workout just finished
       flushing: false,
       history: null,
+      exerciseNames: null,    // exercise id → name (exerciseNames), for every account alike
 
       /** Loads this account's pointers; call on every screen mount (the account may have changed). */
       hydrate() {
@@ -164,6 +194,23 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
           } while (cursor)
           set({ catalog: items, catalogError: null })
         } catch (e) { set({ catalogError: e }) }
+      },
+
+      /** Exercise names from Reppen's exercise catalog: the copy kept in this browser at once, then
+       *  revalidated by its ETag once per page load. A failure leaves the ids showing and lets the
+       *  next screen try again; it is not an error worth a banner. */
+      loadExerciseNames() {
+        const kept = readNames(storage)
+        if (kept && !get().exerciseNames) set({ exerciseNames: kept.names })
+        // The direct client: the answer is the same for every account, so it may land after a switch.
+        namesLoad ??= Promise.resolve().then(() => direct.exerciseCatalog(kept?.etag ?? null)).then(answer => {
+          if (answer.notModified) return
+          const names = exerciseNames(answer.catalog)
+          if (!names) return
+          try { storage.setItem(NAMES_KEY, JSON.stringify({ etag: answer.etag, names })) } catch { /* private mode: kept for this page only */ }
+          set({ exerciseNames: names })
+        }).catch(() => { namesLoad = null })
+        return namesLoad
       },
 
       async loadEnrollment() {
