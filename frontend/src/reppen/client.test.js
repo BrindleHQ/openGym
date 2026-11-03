@@ -19,6 +19,11 @@ function setup(answers) {
 }
 
 describe('Reppen client', () => {
+  it('discovers at most two enrollments through the authenticated account endpoint', async () => {
+    const { client, calls } = setup([json(200, { items: [], nextCursor: null })])
+    expect(await client.enrollments()).toEqual({ items: [], nextCursor: null })
+    expect(calls[0]).toMatchObject({ url: '/gym/reppen/v1/enrollments?limit=2', method: 'GET', auth: 'Bearer tok1', credentials: 'omit' })
+  })
   it('allows only the cached account to reopen its runner without server config', () => {
     const kept = { version: 1, owner: 'one', data: { local: { enrollment: { enrollmentId: 'e' } } } }
     const storage = { getItem: () => JSON.stringify(kept) }

@@ -16,6 +16,7 @@ export function fakeClient(overrides = {}) {
   return {
     catalog: vi.fn(async cursor => (cursor ? { items: [{ ...GZCLP, artifactId: 'sha256:2', title: 'Two' }], nextCursor: null } : { items: [GZCLP], nextCursor: 'p2' })),
     enrollment: vi.fn(async id => ({ enrollmentId: id, revision: 0 })),
+    enrollments: vi.fn(async () => ({ items: [], nextCursor: null })),
     enroll: vi.fn(async (id, body) => ({ enrollmentId: id, artifactId: body.artifactId, revision: 0 })),
     history: vi.fn(async () => ({ items: [], nextCursor: null })),
     exerciseCatalog: vi.fn(async () => ({ notModified: true })),

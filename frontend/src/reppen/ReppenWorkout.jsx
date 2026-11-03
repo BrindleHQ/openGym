@@ -14,6 +14,7 @@ import { exerciseName } from './store.js'
 import { LB_KG } from './setup.js'
 import { Held } from './ReppenPrograms.jsx'
 import OfflineStatus from './OfflineStatus.jsx'
+import StartingWeight, { ExerciseGuidance, pendingSetup } from './StartingWeight.jsx'
 import './reppen.css'
 
 const actions = () => reppenStore.getState()
@@ -58,7 +59,7 @@ function SetRow({ slot, step, set, index, number, logged, taken, unit, sourceUni
     {metrics.map(m => <label key={m} className="rp-m">
       <NumberField value={shown(m)} nullable disabled={done || disabled} aria-label={metricLabel(m, unit)}
         onChange={v => setDraft(d => ({ ...d, [m]: m === 'load' ? loadIn(v, unit, sourceUnit) : v }))} />
-      <span className="rp-t">{targetText(set.metrics[m], m === 'load' ? v => loadIn(v, sourceUnit, unit) : undefined) ?? t('calculated')} {metricLabel(m, unit)}</span>
+      <span className="rp-t">{set.metrics[m]?.reason === 'startingLoadRequired' ? t('Starting weight needed') : targetText(set.metrics[m], m === 'load' ? v => loadIn(v, sourceUnit, unit) : undefined) ?? t('calculated')} {metricLabel(m, unit)}</span>
     </label>)}
     <Check checked={done} disabled={disabled} label={t('Set {0} done', number)} onChange={toggle} />
     {Number.isFinite(set.restSec) && <small className="rp-rest">{t('Rest (s)')}: {set.restSec}</small>}
@@ -68,6 +69,10 @@ function SetRow({ slot, step, set, index, number, logged, taken, unit, sourceUni
 
 function SlotCard({ slot, logged, drafts, unit, sourceUnit, disabled }) {
   const names = useReppen(s => s.exerciseNames)
+  const outbox = useReppen(s => s.outbox)
+  const events = useReppen(s => s.workout?.events)
+  const setupBlocked = slot.setup?.loadRequired || pendingSetup(outbox, slot.slot)
+  const started = [...(events || []), ...outbox].some(e => e.kind === 'setLogged' && e.slot === slot.slot)
   // Sets are numbered through the exercise, as on the app's own workout screen; each still logs
   // under its own step key and index.
   let number = 0
@@ -75,10 +80,14 @@ function SlotCard({ slot, logged, drafts, unit, sourceUnit, disabled }) {
   const title = slot.exercise?.label || (slot.exercise?.id ? exerciseName(names, slot.exercise.id) : slot.slot)
   return <div className="card rp-slot" data-slot={slot.slot}>
     <h2>{title}</h2>
+    {slot.setup && <ExerciseGuidance slot={slot} />}
+    <StartingWeight key={unit} slot={slot} unit={unit} disabled={disabled} started={started} />
+    {slot.setup?.confirmedThisWorkout && <p className="sect-f">{t('Starting weight confirmed. Log your working sets below; this session establishes your baseline.')}</p>}
+    {slot.setup && <p className="sect-f">{t('RIR means how many more reps you could do with the same form. A target of 2 means stop with about two reps left.')}</p>}
     {slot.steps.map(step => <div key={step.key} className="rp-step" data-step={step.key}>
       {step.live && <p className="sect-f">{t('Reppen calculated these targets from the sets you logged.')}</p>}
-      {step.sets.map((set, i) => <SetRow key={i} slot={slot.slot} step={step} set={set} index={i} number={++number}
-        logged={logged.get(posKey(slot.slot, step.key, i))} taken={drafts.get(posKey(slot.slot, step.key, i))} unit={unit} sourceUnit={sourceUnit} disabled={disabled} />)}
+      {step.sets.map((set, i) => <SetRow key={slot.setup ? `${i}:${slot.setup.workingLoadKg}` : i} slot={slot.slot} step={step} set={set} index={i} number={++number}
+        logged={logged.get(posKey(slot.slot, step.key, i))} taken={drafts.get(posKey(slot.slot, step.key, i))} unit={unit} sourceUnit={sourceUnit} disabled={disabled || setupBlocked} />)}
     </div>)}
   </div>
 }
@@ -179,6 +188,8 @@ export default function ReppenWorkout() {
   const stamp = plan?.stamp || workout?.plan?.stamp
   const sourceUnit = stamp?.display?.load || 'kg'
   const questions = workout?.pendingQuestions || []
+  const needsWorkingSet = (plan?.slots || []).some(slot => slot.setup) && !(plan?.slots || []).some(slot =>
+    slot.steps.some(step => step.sets.some((set, i) => set.role !== 'warmup' && logged.has(posKey(slot.slot, step.key, i)))))
   const canFinishOffline = workout && actions().previewOfflineFinish().finish.k === 'finished'
   return <div className="narrow reppen">
     {head(workout ? t('Day {0}', workout.day) : t('Workout'), local.enrollment?.title)}
@@ -194,9 +205,10 @@ export default function ReppenWorkout() {
       return <SlotCard key={workout.workoutId + ':' + slot.slot} slot={slot} logged={logged} drafts={drafts} unit={unit} sourceUnit={issuedUnit} disabled={busy} />
     })}
     {workout && <div className="rp-finish">
-      <Button variant="filled" disabled={busy || questions.length > 0 || ((disconnected || offline || outbox.length > 0) && !canFinishOffline)}
+      <Button variant="filled" disabled={busy || needsWorkingSet || questions.length > 0 || ((disconnected || offline || outbox.length > 0) && !canFinishOffline)}
         onClick={async () => { await actions().finish() }}>{t('Finish workout')}</Button>
       {questions.length > 0 && <p className="sect-f">{t('Answer the open questions before finishing.')}</p>}
+      {needsWorkingSet && <p className="sect-f">{t('Log at least one working set before finishing. Practice sets do not count.')}</p>}
       {(disconnected || offline || outbox.length > 0) && !canFinishOffline && <p className="sect-f">{t('Connect to finish this workout. Your entries are saved on this device.')}</p>}
     </div>}
   </div>

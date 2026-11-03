@@ -275,7 +275,29 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
 
       async loadEnrollment() {
         const id = get().local.enrollment?.enrollmentId
-        if (!id) return null
+        if (!id) {
+          // A new browser can recover one unambiguous server enrollment. Never
+          // replace a pending local request or choose between multiple programs.
+          const empty = () => {
+            const s = get(), local = s.local
+            return !s.busy && !local.enrollment && !local.pendingEnrollment && !local.pendingStart && !local.workoutId
+              && !s.workout && !s.outbox.length && !s.offlineJournal?.length && !s.offlineStart
+          }
+          if (!empty() || typeof direct.enrollments !== 'function') return null
+          try {
+            const page = await client.enrollments()
+            if (!empty() || page.nextCursor || page.items?.length !== 1) return null
+            const view = page.items[0]
+            if (!view.enrollmentId || !view.artifactId || !Array.isArray(view.days) || !view.days.length
+              || !view.days.every(d => typeof d === 'string') || typeof view.title !== 'string') return null
+            const enrollment = { enrollmentId: view.enrollmentId, artifactId: view.artifactId, catalogId: view.catalogId,
+              title: view.title, days: view.days, defaultDay: view.defaultDay ?? null }
+            save({ enrollment, nextDay: view.activeWorkout?.day ?? view.nextDay ?? null,
+              workoutId: view.activeWorkout?.workoutId ?? null }, true)
+            set({ enrollmentView: view, enrollmentError: null })
+            return view
+          } catch (e) { if (empty()) set({ enrollmentError: e }); return null }
+        }
         try {
           const view = await client.enrollment(id)
           if (get().local.enrollment?.enrollmentId !== id) return null

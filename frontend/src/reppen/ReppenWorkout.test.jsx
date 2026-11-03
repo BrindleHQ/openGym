@@ -63,9 +63,93 @@ beforeEach(async () => {
   await reppenStore.getState().loadCatalog()
   await reppenStore.getState().enroll(reppenStore.getState().catalog[0], { 0: 140, 1: 100 })
 })
-afterEach(() => { act(() => { mounted.splice(0).forEach(r => r.unmount()) }); document.body.innerHTML = '' })
+afterEach(() => { act(() => { mounted.splice(0).forEach(r => r.unmount()) }); document.body.innerHTML = ''; vi.restoreAllMocks() })
 
 describe('Reppen workout screens', () => {
+  it('can correct a newly confirmed starting weight before work, but not after a logged set is cleared', async () => {
+    await reppenStore.getState().start('A1')
+    useStore.setState(s => ({ S: { ...s.S, unit: 'kg' } }))
+    await act(async () => reppenStore.setState(s => {
+      const plan = structuredClone(s.workout.plan)
+      plan.slots[0].setup = { loadRequired: false, workingLoadKg: 20, incrementKg: null, progressionPending: false, confirmedThisWorkout: true, trials: [] }
+      return { workout: { ...s.workout, effectivePlan: plan } }
+    }))
+    const host = await render(ReppenWorkout)
+    const confirm = vi.spyOn(reppenStore.getState(), 'confirmStartingLoad').mockResolvedValue()
+    await click(button(host, 'Edit'))
+    await act(async () => type(host.querySelector('[aria-label="Starting weight (kg)"]'), '25'))
+    await click(button(host, 'Use this starting weight'))
+    expect(confirm).toHaveBeenCalledWith('squat', 25, 'known')
+    await act(async () => reppenStore.setState(s => ({ workout: { ...s.workout, events: [
+      { id: 'work', kind: 'setLogged', slot: 'squat', step: 'work', set: 0, values: { load: 20, reps: 8 } },
+      { id: 'clear', kind: 'setCleared', slot: 'squat', step: 'work', set: 0 },
+    ] } })))
+    expect(button(host, 'Edit')).toBeUndefined()
+  })
+  it('guides practice in profile units, blocks working sets until confirmed, and keeps queued setup visible', async () => {
+    await reppenStore.getState().start('A1')
+    const pack = vi.spyOn(reppenStore.getState(), 'loadOfflinePack').mockResolvedValue(null)
+    useStore.setState(s => ({ S: { ...s.S, unit: 'lb' } }))
+    const changeSetup = async (patch, trial = null) => act(async () => reppenStore.setState(s => {
+      const plan = structuredClone(s.workout.effectivePlan || s.workout.plan)
+      plan.slots[0].setup = { loadRequired: true, workingLoadKg: null, incrementKg: null, progressionPending: false, trials: [], ...plan.slots[0].setup, ...patch }
+      for (const set of plan.slots[0].steps[0].sets) set.metrics.load = { k: 'unknown', reason: 'startingLoadRequired' }
+      return { workout: { ...s.workout, effectivePlan: plan }, offlinePack: null, ...(trial ? { outbox: [trial] } : {}) }
+    }))
+    await changeSetup({})
+    const host = await render(ReppenWorkout)
+    const first = row(host, 'squat|work|0')
+    expect(first.querySelector('[role=checkbox]').disabled).toBe(true)
+    expect(first.textContent).toContain('Starting weight needed')
+    expect(button(host, 'Finish workout').disabled).toBe(true)
+    expect(host.textContent).toContain('Log at least one working set before finishing. Practice sets do not count.')
+    await click(button(host, 'Help me find it'))
+    expect(host.textContent).toContain('These are practice sets.')
+    const trial = vi.spyOn(reppenStore.getState(), 'logLoadTrial').mockResolvedValue()
+    await act(async () => {
+      type(host.querySelector('[aria-label="Practice weight (lb)"]'), '20')
+      type(host.querySelector('[aria-label="Practice reps"]'), '10')
+    })
+    await click(button(host, 'Manageable'))
+    expect(trial).toHaveBeenCalledWith('squat', 20 * 0.45359237, 10, 'manageable')
+    trial.mockRestore()
+    await changeSetup({ trials: [{ loadKg: 20 * 0.45359237, reps: 10, feedback: 'manageable' }] })
+    const confirm = vi.spyOn(reppenStore.getState(), 'confirmStartingLoad').mockResolvedValue()
+    await click(button(host, 'Use 20 lb as my starting weight'))
+    expect(confirm).toHaveBeenCalledWith('squat', 20 * 0.45359237, 'trial')
+    confirm.mockRestore()
+    wire.offlineEvents = true
+    await changeSetup({}, { id: 'queued', kind: 'startingLoadConfirmed', slot: 'squat', loadKg: 20 * 0.45359237, source: 'trial' })
+    expect(host.textContent).toContain('Setup saved on this device.')
+    expect(first.querySelector('[role=checkbox]').disabled).toBe(true)
+    expect(button(host, 'Use 20 lb as my starting weight').disabled).toBe(true)
+    pack.mockRestore()
+  })
+  it('offers the next available weight only for an earned increase and never after working sets begin', async () => {
+    await reppenStore.getState().start('A1')
+    useStore.setState(s => ({ S: { ...s.S, unit: 'kg' } }))
+    await act(async () => reppenStore.setState(s => {
+      const plan = structuredClone(s.workout.plan)
+      plan.slots[0].setup = { loadRequired: false, workingLoadKg: 20, incrementKg: null, progressionPending: true, trials: [] }
+      return { workout: { ...s.workout, effectivePlan: plan } }
+    }))
+    const host = await render(ReppenWorkout)
+    expect(button(host, 'Use the heavier weight').disabled).toBe(true)
+    const confirm = vi.spyOn(reppenStore.getState(), 'confirmEquipment').mockResolvedValue()
+    await act(async () => type(host.querySelector('[aria-label="Next available weight (kg)"]'), '25'))
+    expect(host.querySelector('.rp-regular-step input').checked).toBe(false)
+    await click(button(host, 'Use the heavier weight'))
+    expect(confirm).toHaveBeenCalledWith('squat', 25)
+    await click(host.querySelector('.rp-regular-step input'))
+    await click(button(host, 'Use the heavier weight'))
+    expect(confirm).toHaveBeenLastCalledWith('squat', 25, 5)
+    await act(async () => type(host.querySelector('[aria-label="Next available weight (kg)"]'), '30'))
+    expect(host.querySelector('.rp-regular-step input').checked).toBe(false)
+    confirm.mockRestore()
+    await act(async () => reppenStore.setState(s => ({ workout: { ...s.workout, events: [{ id: 'work', kind: 'setLogged', slot: 'squat', step: 'work', set: 0, values: { load: 20, reps: 8 } }] } })))
+    expect(button(host, 'Use the heavier weight')).toBeUndefined()
+    expect(host.textContent).toContain('Keep your current weight for this workout.')
+  })
   it('renders every real Dorito quality, fifth-set, recovery and duration choice without skipping', async () => {
     await reppenStore.getState().start('A1')
     const host = await render(ReppenWorkout)
