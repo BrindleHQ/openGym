@@ -20,6 +20,10 @@ import { createStore } from 'zustand/vanilla'
 import { isRevisionConflict } from './client.js'
 
 const KEY = owner => 'reppen.v1.' + owner
+const isSetEvent = e => e.kind === 'setLogged' || e.kind === 'setCleared'
+const samePos = (a, b) => a.slot === b.slot && a.step === b.step && a.set === b.set
+const dropDraftsAt = (rejected, draft) =>
+  rejected.filter(r => r !== draft && !(r.code === 'setTaken' && samePos(r.event, draft.event)))
 
 export function newId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
@@ -90,8 +94,9 @@ export const exerciseName = (names, id) => names?.[id] || id
 /**
  * @param {{ client: ReturnType<import('./client.js').reppenClient>, owner: () => string|null|undefined,
  *   storage?: Storage, today: () => string, recordFinished?: (result: object, info: { title?: string, names?: object }) => void }} deps
- *   `recordFinished` is told of every finished workout this device learns of (its own finish, or a
- *   finished one found on resuming), as often as it learns of it; it must be idempotent (history.js).
+ *   `recordFinished` is told of every finished workout this device learns of (its own finish, one
+ *   another device finished, or one found finished on resuming), as often as it learns of it; it
+ *   must be idempotent (history.js).
  */
 export function createReppenStore({ client: direct, owner, storage = globalThis.localStorage, today, recordFinished = () => {} }) {
   let generation = 0
@@ -118,7 +123,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       const previous = get().workout?.workoutId
       const switching = previous && previous !== view.workoutId
       set({ workout: view, ...(switching ? {
-        outbox: [], rejected: [...get().rejected, ...get().outbox.map(event => ({ workoutId: previous, event, code: 'workoutChanged' }))],
+        outbox: [], rejected: [...get().rejected.map(r => ({ ...r, workoutId: r.workoutId || previous, code: 'workoutChanged' })), ...get().outbox.map(event => ({ workoutId: previous, event, code: 'workoutChanged' }))],
       } : {}) })
     }
     function completedWorkout(id, error, events = []) {
@@ -132,20 +137,55 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
       try { recordFinished(result, { title: get().local.enrollment?.title, names: get().exerciseNames }) }
       catch { /* the Reppen side is done; the copy in OpenGym's history is retried on the next delivery */ }
     }
+    let catching = null
+    let sendError = null   // the error the last failed send left showing, for catch-up to clear
+    // Every event made here, with the workout revision this device had seen when it was made.
+    const seenAt = new Map()
     function enqueue(event) {
       if (!get().workout || get().busy) return Promise.resolve()
-      set({ outbox: [...get().outbox, { id: newId(), ...event }] })
+      const id = newId()
+      seenAt.set(id, get().workout.revision)
+      // A new log or clear of a set settles any draft another device's save left there.
+      const rejected = isSetEvent(event)
+        ? get().rejected.filter(r => !(r.code === 'setTaken' && samePos(r.event, event))) : get().rejected
+      set({ outbox: [...get().outbox, { id, ...event }], rejected })
       return get().flush()
+    }
+    /* Takes what Reppen now holds for the workout. Events of ours among them were accepted (a lost
+     * answer) and leave the outbox. An event for a set that another device logged or cleared after
+     * this one last saw the workout lost the race: the first accepted event wins, so it becomes a
+     * rejected draft (`setTaken`) instead of being sent over the other. A finished workout moves
+     * this device to the finished state, as if it had finished here. An older view than the one
+     * held is ignored. */
+    function adopt(view) {
+      const cur = get().workout
+      if (!cur || cur.workoutId !== view.workoutId || view.revision < cur.revision) return
+      const events = view.events || []
+      const held = new Set(events.map(ev => ev.id))
+      const outbox = [], lost = []
+      for (const ev of get().outbox) {
+        if (held.has(ev.id)) continue
+        const taken = isSetEvent(ev) && events.slice(seenAt.get(ev.id) ?? 0)
+          .some(x => isSetEvent(x) && !seenAt.has(x.id) && samePos(x, ev))
+        if (taken) lost.push({ event: ev, code: 'setTaken' }); else outbox.push(ev)
+      }
+      if (view.status !== 'completed') { set({ workout: view, outbox, rejected: [...get().rejected, ...lost], held: heldBy(view) }); return }
+      const { enrollment } = get().local
+      save({ workoutId: null, nextDay: suggestNextDay(enrollment?.days, view.day, enrollment?.defaultDay) })
+      set({ workout: null, outbox: [], held: null, finished: { workout: view, completed: view.completed },
+        rejected: [...get().rejected, ...lost, ...outbox.map(event => ({ event, code: 'workoutFinished' }))] })
+      finished(view)
     }
     // A refused batch: true when the outbox was put right and can be sent again.
     async function recover(e, id, current) {
+      // A catch-up during the send may already have found the workout finished and moved the
+      // outbox to the rejected drafts; there is nothing left to put right or send.
+      if (!current()) return true
       if (isRevisionConflict(e) || e.code === 'workoutFinished') {
         // Fetch what Reppen holds; events of ours already among them were accepted (a lost answer).
         const view = await client.workout(id).catch(() => null)
         if (!view || !current()) return false
-        if (view.status === 'completed') { completedWorkout(id, e, view.events); return true }
-        const held = new Set((view.events || []).map(ev => ev.id))
-        set({ workout: view, outbox: get().outbox.filter(ev => !held.has(ev.id)) })
+        adopt(view)
         return true
       }
       // One event Reppen will not take (a set another device logged first, a question no longer
@@ -156,7 +196,10 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         if (!ev) return false
         const view = await client.workout(id).catch(() => null)
         if (!current()) return false
-        set({ outbox: get().outbox.filter(x => x.id !== bad), rejected: [...get().rejected, { event: ev, code: e.code }], ...(view ? { workout: view } : {}) })
+        // A catch-up during the refetch may already have moved it to the rejected entries.
+        if (get().outbox.some(x => x.id === bad))
+          set({ outbox: get().outbox.filter(x => x.id !== bad), rejected: [...get().rejected, { event: ev, code: e.code }] })
+        if (view) adopt(view)
         return true
       }
       return false
@@ -185,6 +228,7 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         if (get().localOwner === who) return
         generation++
         flushRun = null
+        catching = null   // the last account's catch-up never settles (the client above)
         set({ local: who ? readLocal(storage, who) : {}, localOwner: who, enrollmentView: null, error: null, catalogError: null, enrollmentError: null, busy: false,
           workout: null, outbox: [], rejected: [], held: null, finished: null, history: null, flushing: false })
       },
@@ -335,11 +379,14 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         if (!id) return null
         try {
           const view = await client.workout(id)
-          if (get().local.workoutId !== id) return null
-          if (view.status === 'completed') { finished(view); completedWorkout(id, null, view.events); return null }
-          adoptWorkout(view)
-          set({ held: heldBy(view) })
-          return view
+          // Forgotten meanwhile (a catch-up found it finished): this answer is older than that.
+          if (get().local.workoutId !== id) return get().workout
+          // The workout already open here may have events waiting: merged, as a catch-up is.
+          if (get().workout?.workoutId === view.workoutId) adopt(view)
+          else if (view.status === 'completed') { finished(view); completedWorkout(id, null, view.events) }
+          else adoptWorkout(view)
+          set({ held: heldBy(get().workout) })
+          return get().workout
         } catch (e) {
           if (e.code === 'workoutNotFound') { save({ workoutId: null }); set({ workout: null }) }
           set({ error: e })
@@ -354,7 +401,33 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
         if (get().outbox.some(e => e.kind === 'questionAnswered' && e.question === question.id && e.occurrence === question.occurrence)) return Promise.resolve()
         return enqueue({ kind: 'questionAnswered', question: question.id, occurrence: question.occurrence, value: choice.value })
       },
-      dismissRejected() { set({ rejected: [] }) },
+      /** Dismisses the rejected entries shown together: all of them once the workout is finished,
+       *  else all but the per-set drafts. */
+      dismissRejected() { set({ rejected: get().workout ? get().rejected.filter(r => r.code === 'setTaken') : [] }) },
+      /** A set another device logged first: send this device's value over it, or drop it. */
+      // Several offline edits to one set can lose the same race; the runner shows the latest, and
+      // saving or discarding it settles the set, so the older ones go with it.
+      relogDraft(draft) {
+        set({ rejected: dropDraftsAt(get().rejected, draft) })
+        const { id, ...event } = draft.event
+        return enqueue(event)
+      },
+      discardDraft(draft) { set({ rejected: dropDraftsAt(get().rejected, draft) }) },
+
+      /** Fetches the workout and takes what other devices did, then sends what is still waiting.
+       *  The runner calls it on focus, when shown again, back online, and every so often. A failed
+       *  fetch is left quiet: the next one tries again, and a send that fails says so itself. */
+      catchUp() {
+        const id = get().workout?.workoutId
+        if (!id) return Promise.resolve()
+        catching ??= client.workout(id).then(view => {
+          adopt(view)
+          if (get().outbox.length) return get().flush()
+          // Everything a failed send left waiting is settled now, so its error no longer applies.
+          if (sendError && get().error === sendError) set({ error: null })
+        }, () => {}).finally(() => { catching = null })
+        return catching
+      },
 
       /** All callers for this workout wait for the same draining run. */
       flush() {
@@ -372,17 +445,17 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
               try {
                 const view = await client.appendEvents(id, revision, batch)
                 if (!current()) return
-                const sent = new Set(batch.map(e => e.id))
-                set({ workout: view, outbox: get().outbox.filter(e => !sent.has(e.id)), error: null })
+                adopt(view)
+                set({ error: null })
                 failures = 0
               } catch (e) {
                 if (!current()) return
                 const before = get().outbox.length
                 const recovered = await recover(e, id, current)
                 if (!current()) return
-                if (!recovered) { set({ error: e }); return }
+                if (!recovered) { sendError = e; set({ error: e }); return }
                 failures = get().outbox.length < before ? 0 : failures + 1
-                if (failures >= 5) { set({ error: e }); return }
+                if (failures >= 5) { sendError = e; set({ error: e }); return }
               }
           }
         }).finally(() => {
@@ -408,8 +481,11 @@ export function createReppenStore({ client: direct, owner, storage = globalThis.
               finished(result)
               return true
             } catch (e) {
-              if (!isRevisionConflict(e) || tries >= 2) throw e
-              set({ workout: await client.workout(workout.workoutId) })
+              if (!(isRevisionConflict(e) || e.code === 'workoutFinished') || tries >= 2) throw e
+              // Another device logged or finished meanwhile: take that, and do not finish twice.
+              adopt(await client.workout(workout.workoutId))
+              if (!get().workout) return !!get().finished
+              if (get().outbox.length) return false
             }
           }
         } catch (e) { set({ error: e }); return false }

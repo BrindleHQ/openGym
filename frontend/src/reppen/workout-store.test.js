@@ -16,7 +16,9 @@ function world() {
   const sent = []
   let drop = null   // which request's answer to lose, after the server applied it
   let afterEvents = null
+  const net = { down: false }   // no request gets through at all
   const fetch = vi.fn(async (url, init) => {
+    if (net.down) throw new TypeError('Failed to fetch')
     const body = init.body ? JSON.parse(init.body) : undefined
     sent.push({ method: init.method, path: url.replace(/^\/reppen/, ''), body })
     const { status, body: out } = fake.handle(init.method, url.replace(/^\/reppen/, ''), body, 'u1')
@@ -30,7 +32,7 @@ function world() {
     store.getState().hydrate()
     return store
   }
-  return { device, sent, afterEvents: fn => { afterEvents = fn }, loseAnswer: (method, suffix) => { drop = (m, url) => m === method && url.split('/').at(-1).startsWith(suffix) }, client }
+  return { device, sent, net, afterEvents: fn => { afterEvents = fn }, loseAnswer: (method, suffix) => { drop = (m, url) => m === method && url.split('/').at(-1).startsWith(suffix) }, client }
 }
 
 async function enrolled(w, store = w.device()) {
@@ -240,6 +242,18 @@ describe('Reppen store: a workout', () => {
     expect(s.getState().workout.revision).toBe(1)   // applied once, not twice
   })
 
+  it('clears the error a lost answer left once a catch-up finds the event accepted', async () => {
+    const w = world()
+    const s = await enrolled(w)
+    await s.getState().start('A1')
+    w.loseAnswer('POST', 'events')
+    await s.getState().logSet('squat', 'work', 0, { load: 100, reps: 5 })
+    expect(s.getState().error.code).toBe('offline')
+    await s.getState().catchUp()
+    expect(s.getState().outbox).toEqual([])
+    expect(s.getState().error).toBe(null)
+  })
+
   it('catches up with another device, then sends what is still its own', async () => {
     const w = world()
     const phone = await enrolled(w)
@@ -283,3 +297,239 @@ describe('Reppen store: a workout', () => {
     expect(phone.getState().workout.day).toBe('B1')
   })
 })
+
+// Two devices on one workout: the phone and the laptop, the laptop opened on the phone's workout.
+async function twoDevices() {
+  const w = world()
+  const phone = await enrolled(w)
+  await phone.getState().start('A1')
+  const recordFinished = vi.fn()
+  const laptop = w.device({ recordFinished })
+  laptop.setState({ local: { ...phone.getState().local } })
+  await laptop.getState().resume()
+  return { w, phone, laptop, recordFinished }
+}
+const values = s => s.getState().workout.events.filter(e => e.kind === 'setLogged').map(e => e.values.load)
+
+describe('Reppen store: two devices on one workout', () => {
+  it('keeps the first value saved for a set; the other device holds its own as a draft', async () => {
+    const { w, phone, laptop } = await twoDevices()
+    await phone.getState().logSet('squat', 'work', 0, { load: 100, reps: 5 })
+    await laptop.getState().logSet('squat', 'work', 0, { load: 105, reps: 5 })
+    // Refused at revision 0, the laptop refetched and found the set taken: it did not send over it.
+    expect(values(laptop)).toEqual([100])
+    expect(laptop.getState().outbox).toEqual([])
+    expect(laptop.getState().rejected).toMatchObject([{ code: 'setTaken', event: { slot: 'squat', step: 'work', set: 0, values: { load: 105 } } }])
+    expect(w.sent.filter(r => r.path.endsWith('/events') && r.body.events.some(e => e.values?.load === 105) && r.body.expectedRevision === 1)).toEqual([])
+    // Saving it anyway is a new event over the phone's.
+    await laptop.getState().relogDraft(laptop.getState().rejected[0])
+    expect(values(laptop)).toEqual([100, 105])
+    expect(laptop.getState().rejected).toEqual([])
+  })
+
+  it('catches up before sending what waited offline, so a set taken meanwhile is not overwritten', async () => {
+    const { w, phone, laptop } = await twoDevices()
+    w.net.down = true
+    await laptop.getState().logSet('squat', 'work', 0, { load: 105, reps: 5 })
+    await laptop.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    expect(laptop.getState().outbox).toHaveLength(2)
+    w.net.down = false
+    await phone.getState().logSet('squat', 'work', 0, { load: 100, reps: 5 })
+    await laptop.getState().catchUp()
+    // The other set goes after the phone's; the taken one waits as a draft the person can discard.
+    expect(laptop.getState().workout.events.map(e => [e.slot, e.values.load])).toEqual([['squat', 100], ['bench', 50]])
+    expect(laptop.getState().outbox).toEqual([])
+    const [draft] = laptop.getState().rejected
+    expect(draft).toMatchObject({ code: 'setTaken', event: { slot: 'squat', values: { load: 105 } } })
+    laptop.getState().discardDraft(draft)
+    expect(laptop.getState().rejected).toEqual([])
+    // The phone sees the laptop's bench set on its next catch-up.
+    await phone.getState().catchUp()
+    expect(phone.getState().workout.revision).toBe(2)
+  })
+
+  it('merges a resume the same way, so a waiting entry is not sent over a set taken meanwhile', async () => {
+    const { w, phone, laptop } = await twoDevices()
+    w.net.down = true
+    await laptop.getState().logSet('squat', 'work', 0, { load: 105, reps: 5 })
+    w.net.down = false
+    await phone.getState().logSet('squat', 'work', 0, { load: 100, reps: 5 })
+    await laptop.getState().resume()    // the Programs screen, opened while the entry waited
+    await laptop.getState().flush()
+    expect(values(laptop)).toEqual([100])
+    expect(laptop.getState().rejected).toMatchObject([{ code: 'setTaken' }])
+  })
+
+  it('does not treat its own earlier events as another device taking the set', async () => {
+    const { laptop } = await twoDevices()
+    await laptop.getState().logSet('squat', 'work', 0, { load: 100, reps: 5 })
+    await laptop.getState().clearSet('squat', 'work', 0)
+    await laptop.getState().logSet('squat', 'work', 0, { load: 102.5, reps: 5 })
+    await laptop.getState().catchUp()
+    expect(laptop.getState().rejected).toEqual([])
+    expect(laptop.getState().workout.revision).toBe(3)
+  })
+
+  it('settles every lost offline edit to a set when its latest draft is saved or discarded', async () => {
+    const { w, phone, laptop } = await twoDevices()
+    w.net.down = true
+    await laptop.getState().logSet('squat', 'work', 0, { load: 50, reps: 5 })
+    await laptop.getState().clearSet('squat', 'work', 0)
+    await laptop.getState().logSet('squat', 'work', 0, { load: 55, reps: 5 })
+    w.net.down = false
+    await phone.getState().logSet('squat', 'work', 0, { load: 100, reps: 5 })
+    await laptop.getState().catchUp()
+    expect(laptop.getState().rejected).toHaveLength(3)
+    // Saving the latest sends 55 once; the superseded clear and 50 do not come back as conflicts.
+    await laptop.getState().relogDraft(laptop.getState().rejected.at(-1))
+    expect(laptop.getState().rejected).toEqual([])
+    expect(values(laptop)).toEqual([100, 55])
+    expect(laptop.getState().workout.events.filter(e => e.kind === 'setCleared')).toEqual([])
+  })
+
+  it('does not fail a send whose workout a catch-up found finished meanwhile', async () => {
+    const { w, phone, laptop } = await twoDevices()
+    await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    await phone.getState().finish()
+    let release
+    const gate = new Promise(r => { release = r })
+    const real = w.client.appendEvents
+    w.client.appendEvents = async (...a) => { await gate; return real(...a) }
+    const send = laptop.getState().logSet('bench', 'work', 1, { load: 50, reps: 10 })
+    await laptop.getState().catchUp()
+    expect(laptop.getState().workout).toBe(null)
+    release()
+    await expect(send).resolves.toBeUndefined()
+    w.client.appendEvents = real
+    expect(laptop.getState().error).toBe(null)
+    expect(laptop.getState().finished).not.toBe(null)
+  })
+
+  it('offers the way out on catch-up when a third device made another workout active', async () => {
+    const { w, phone, laptop } = await twoDevices()
+    const tablet = w.device()
+    tablet.setState({ local: { ...phone.getState().local, workoutId: null } })
+    expect(await tablet.getState().start('B1')).toBe(false)
+    await tablet.getState().continueHeld()
+    await laptop.getState().catchUp()
+    expect(laptop.getState().held.active.workoutId).toBe(tablet.getState().workout.workoutId)
+  })
+
+  it('leaves one workout\'s drafts behind when continuing the workout another device made active', async () => {
+    const { w, phone, laptop } = await twoDevices()
+    await phone.getState().logSet('squat', 'work', 0, { load: 100, reps: 5 })
+    await laptop.getState().logSet('squat', 'work', 0, { load: 105, reps: 5 })
+    expect(laptop.getState().rejected).toMatchObject([{ code: 'setTaken' }])
+    const tablet = w.device()
+    tablet.setState({ local: { ...phone.getState().local, workoutId: null } })
+    await tablet.getState().start('B1')
+    await tablet.getState().continueHeld()
+    await laptop.getState().catchUp()
+    await laptop.getState().continueActive()
+    expect(laptop.getState().workout.workoutId).toBe(tablet.getState().workout.workoutId)
+    expect(laptop.getState().rejected).toMatchObject([{ code: 'workoutChanged', event: { values: { load: 105 } } }])
+    expect(laptop.getState().rejected.every(r => r.workoutId !== laptop.getState().workout.workoutId)).toBe(true)
+    expect(laptop.getState().outbox).toEqual([])
+  })
+
+  it('settles a draft when the set is logged or cleared again, so Save mine cannot overwrite it', async () => {
+    const { phone, laptop } = await twoDevices()
+    await phone.getState().logSet('squat', 'work', 0, { load: 100, reps: 5 })
+    await laptop.getState().logSet('squat', 'work', 0, { load: 105, reps: 5 })
+    expect(laptop.getState().rejected).toMatchObject([{ code: 'setTaken' }])
+    await laptop.getState().clearSet('squat', 'work', 0)
+    expect(laptop.getState().rejected).toEqual([])
+  })
+
+  it('records a refused event once when a catch-up moves it during the refetch', async () => {
+    const { w, phone, laptop } = await twoDevices()
+    await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    await laptop.getState().catchUp()
+    const realAppend = w.client.appendEvents
+    const realWorkout = w.client.workout
+    // Reppen refuses the one event; while recover() refetches, a catch-up finds the workout finished.
+    w.client.appendEvents = async (id, rev, events) => {
+      throw Object.assign(new Error('refused'), { code: 'invalidEvent', body: { eventId: events[0].id } })
+    }
+    w.client.workout = async id => {
+      w.client.workout = realWorkout
+      await phone.getState().finish()
+      await laptop.getState().catchUp()
+      return realWorkout(id)
+    }
+    await laptop.getState().logSet('bench', 'work', 1, { load: 50, reps: 10 })
+    w.client.appendEvents = realAppend
+    expect(laptop.getState().rejected.filter(r => r.event.set === 1)).toHaveLength(1)
+  })
+
+  it('moves the other device to the finished state without finishing again', async () => {
+    const { w, phone, laptop, recordFinished } = await twoDevices()
+    await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    expect(await phone.getState().finish()).toBe(true)
+    await laptop.getState().catchUp()
+    expect(laptop.getState().workout).toBe(null)
+    expect(laptop.getState().finished.completed).toMatchObject({ day: 'A1', workoutId: phone.getState().finished.completed.workoutId })
+    expect(laptop.getState().local).toMatchObject({ workoutId: null, nextDay: 'B1' })
+    expect(w.sent.filter(r => r.path.endsWith('/finish'))).toHaveLength(1)
+    // OpenGym history hears of it from this device too; history.js keeps one copy.
+    expect(recordFinished).toHaveBeenCalledTimes(1)
+    expect(recordFinished.mock.calls[0][0]).toMatchObject({ status: 'completed', completed: { day: 'A1' } })
+  })
+
+  it('takes the other device\'s finish when its own Finish loses the race', async () => {
+    const { w, phone, laptop } = await twoDevices()
+    await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    await laptop.getState().catchUp()
+    await phone.getState().logSet('bench', 'work', 1, { load: 50, reps: 10 })
+    expect(await phone.getState().finish()).toBe(true)
+    // The laptop still holds revision 1 and the active workout.
+    expect(await laptop.getState().finish()).toBe(true)
+    expect(laptop.getState().finished.completed.revision).toBe(2)
+    expect(w.sent.filter(r => r.path.endsWith('/finish')).map(r => r.body.expectedRevision)).toEqual([2, 1])
+  })
+
+  it('keeps an entry that was still waiting when the other device finished, as a rejected one', async () => {
+    const { w, phone, laptop } = await twoDevices()
+    await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    await phone.getState().finish()
+    w.net.down = true
+    await laptop.getState().logSet('bench', 'work', 1, { load: 50, reps: 10 })
+    w.net.down = false
+    await laptop.getState().catchUp()
+    expect(laptop.getState().finished).not.toBe(null)
+    expect(laptop.getState().rejected).toMatchObject([{ code: 'workoutFinished', event: { set: 1 } }])
+  })
+
+  it('does not reopen a workout a catch-up found finished when an older resume answers late', async () => {
+    const { w, phone, laptop } = await twoDevices()
+    let release
+    const gate = new Promise(r => { release = r })
+    const real = w.client.workout
+    w.client.workout = async id => { const view = await real(id); await gate; return view }
+    const late = laptop.getState().resume()
+    w.client.workout = real
+    await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    await phone.getState().finish()
+    await laptop.getState().catchUp()
+    release()
+    await late
+    expect(laptop.getState().workout).toBe(null)
+    expect(laptop.getState().finished).not.toBe(null)
+  })
+
+  it('ignores a catch-up answer older than what it already holds', async () => {
+    const { w, laptop } = await twoDevices()
+    // The catch-up's answer is held back until a send has moved the workout past it.
+    let release
+    const gate = new Promise(r => { release = r })
+    const real = w.client.workout
+    w.client.workout = async id => { const view = await real(id); await gate; return view }
+    const late = laptop.getState().catchUp()
+    w.client.workout = real
+    await laptop.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
+    release()
+    await late
+    expect(laptop.getState().workout.revision).toBe(1)
+  })
+})
+

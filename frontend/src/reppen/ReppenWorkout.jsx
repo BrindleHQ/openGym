@@ -18,12 +18,28 @@ const actions = () => reppenStore.getState()
 
 const metricLabel = (m, unit) => (m === 'load' ? (unit || 'kg') : m === 'reps' ? t('Reps') : m)
 const roleLabel = role => (role === 'amrap' ? t('AMRAP') : role === 'working' ? null : role)
+// How often the open runner catches up with other devices while it is shown.
+export const CATCH_UP_MS = 20000
 
-function SetRow({ slot, step, set, index, number, logged, unit, disabled }) {
+// This device's entry for a set another device logged first: what it was, and both ways out.
+function Draft({ draft, metrics, unit }) {
+  const { values } = draft.event
+  const mine = draft.event.kind === 'setLogged'
+    ? metrics.filter(m => values?.[m] != null).map(m => `${values[m]} ${metricLabel(m, unit)}`).join(' × ') : t('cleared')
+  return <div className="rp-draft" role="alert">
+    <span>{t('Another device saved this set first. Yours was: {0}', mine)}</span>
+    <Button size="sm" variant="tinted" onClick={() => actions().relogDraft(draft)}>{t('Save mine')}</Button>
+    <Button size="sm" onClick={() => actions().discardDraft(draft)}>{t('Discard')}</Button>
+  </div>
+}
+
+function SetRow({ slot, step, set, index, number, logged, taken, unit, disabled }) {
   const metrics = metricOrder(set.metrics)
   const [draft, setDraft] = useState({})
-  const value = m => (m in draft ? draft[m] : startValue(set.metrics[m], logged?.values?.[m]))
   const done = !!logged
+  // A logged set shows what Reppen holds, which may be another device's value, not what was typed
+  // here, and a metric logged blank stays blank rather than falling back to the target.
+  const value = m => (done ? logged.values?.[m] ?? null : m in draft ? draft[m] : startValue(set.metrics[m]))
   const toggle = () => {
     if (done) return actions().clearSet(slot, step.key, index)
     const values = {}
@@ -39,10 +55,11 @@ function SetRow({ slot, step, set, index, number, logged, unit, disabled }) {
       <span className="rp-t">{targetText(set.metrics[m]) ?? t('calculated')} {metricLabel(m, unit)}</span>
     </label>)}
     <Check checked={done} disabled={disabled} label={t('Set {0} done', number)} onChange={toggle} />
+    {taken && <Draft draft={taken} metrics={metrics} unit={unit} />}
   </div>
 }
 
-function SlotCard({ slot, logged, unit, disabled }) {
+function SlotCard({ slot, logged, drafts, unit, disabled }) {
   const names = useReppen(s => s.exerciseNames)
   // Sets are numbered through the exercise, as on the app's own workout screen; each still logs
   // under its own step key and index.
@@ -54,7 +71,7 @@ function SlotCard({ slot, logged, unit, disabled }) {
     {slot.steps.map(step => <div key={step.key} className="rp-step" data-step={step.key}>
       {step.live && <p className="sect-f">{t('Reppen calculated these targets from the sets you logged.')}</p>}
       {step.sets.map((set, i) => <SetRow key={i} slot={slot.slot} step={step} set={set} index={i} number={++number}
-        logged={logged.get(posKey(slot.slot, step.key, i))} unit={unit} disabled={disabled} />)}
+        logged={logged.get(posKey(slot.slot, step.key, i))} taken={drafts.get(posKey(slot.slot, step.key, i))} unit={unit} disabled={disabled} />)}
     </div>)}
   </div>
 }
@@ -102,33 +119,49 @@ export default function ReppenWorkout() {
     st.resume().finally(() => setLoaded(true))
   }, [ok, user?.id])
 
+  // Another device may log on this workout or finish it: catch up when the runner comes back into
+  // view or online, and every CATCH_UP_MS while it is shown.
+  const open = workout?.workoutId
+  useEffect(() => {
+    if (!ok || !open) return
+    const catchUp = () => { if (document.visibilityState !== 'hidden') actions().catchUp() }
+    const timer = setInterval(catchUp, CATCH_UP_MS)
+    const on = [[document, 'visibilitychange'], [window, 'focus'], [window, 'online']]
+    for (const [target, name] of on) target.addEventListener(name, catchUp)
+    return () => { clearInterval(timer); for (const [target, name] of on) target.removeEventListener(name, catchUp) }
+  }, [ok, open])
+
   if (!config) return null
   if (!ok) return <Navigate to="/plan" replace />
   const head = (title, sub) => <div className="hdr">
     <button className="iconbtn" data-back="/reppen" onClick={() => nav('/reppen')} aria-label={t('Programs')}><Icon name="chevronLeft" /></button>
     <div style={{ flex: 1, marginInlineStart: 12 }}><h1>{title}</h1>{sub && <div className="sub">{sub}</div>}</div>
   </div>
+  // Finished, there are no set rows to hold a draft: every entry not taken is counted here.
+  const others = workout ? rejected.filter(r => r.code !== 'setTaken') : rejected
+  const othersNote = others.length > 0 && <div className="card reppen-error" role="alert">
+    {t('Reppen did not take {0} of your entries. Log them again if they are still right.', others.length)}
+    <Button size="sm" onClick={() => actions().dismissRejected()}>{t('OK')}</Button>
+  </div>
   if (!workout) {
-    if (finished) return <div className="narrow reppen">{head(t('Workout'))}<Finished result={finished} nextDay={local.nextDay} nav={nav} /></div>
+    if (finished) return <div className="narrow reppen">{head(t('Workout'))}{othersNote}<Finished result={finished} nextDay={local.nextDay} nav={nav} /></div>
     if (!loaded) return <div className="narrow reppen">{head(t('Workout'))}</div>
     if (!error) return <Navigate to="/reppen" replace />
   }
 
   const plan = workout?.effectivePlan || workout?.plan
   const logged = loggedSets(workout, outbox)
+  const drafts = new Map(rejected.filter(r => r.code === 'setTaken').map(r => [posKey(r.event.slot, r.event.step, r.event.set), r]))
   const unit = plan?.stamp?.display?.load
   const questions = workout?.pendingQuestions || []
   return <div className="narrow reppen">
     {head(workout ? t('Day {0}', workout.day) : t('Workout'), local.enrollment?.title)}
     {(error || outbox.length > 0) && <div className="card reppen-error" role="alert">{errorText(error)}
       {workout && <Button size="sm" onClick={() => actions().flush()}>{t('Try again')}</Button>}</div>}
-    {rejected.length > 0 && <div className="card reppen-error" role="alert">
-      {t('Reppen did not take {0} of your entries. Log them again if they are still right.', rejected.length)}
-      <Button size="sm" onClick={() => actions().dismissRejected()}>{t('OK')}</Button>
-    </div>}
+    {othersNote}
     {held && <Held held={held} nav={nav} />}
     {questions.map(q => <Question key={q.occurrence} q={q} />)}
-    {(plan?.slots || []).map(slot => <SlotCard key={workout.workoutId + ':' + slot.slot} slot={slot} logged={logged} unit={unit} disabled={busy} />)}
+    {(plan?.slots || []).map(slot => <SlotCard key={workout.workoutId + ':' + slot.slot} slot={slot} logged={logged} drafts={drafts} unit={unit} disabled={busy} />)}
     {workout && <div className="rp-finish">
       <Button variant="filled" disabled={busy || questions.length > 0 || outbox.length > 0}
         onClick={async () => { await actions().finish() }}>{t('Finish workout')}</Button>
