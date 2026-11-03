@@ -11,7 +11,7 @@ docker run -d --name "$id" --network none --tmpfs /var/lib/postgresql/data \
   -e PGUSER=reppen -e PGDATABASE=reppen -e RETENTION_DAYS=7 \
   -v "$dir:/archive" -v "$root/deploy/reppen-backup.sh:/backup.sh:ro" "$image" >/dev/null
 for _ in $(seq 1 60); do
-  if docker exec "$id" pg_isready -U reppen -d reppen >/dev/null 2>&1; then break; fi
+  if docker exec "$id" pg_isready -h 127.0.0.1 -U reppen -d reppen >/dev/null 2>&1; then break; fi
   sleep 1
 done
 docker exec "$id" psql -U reppen -d reppen -v ON_ERROR_STOP=1 -c 'CREATE TABLE backup_fixture (id integer PRIMARY KEY); INSERT INTO backup_fixture VALUES (42);' >/dev/null

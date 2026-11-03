@@ -10,7 +10,7 @@ docker run -d --name "$id" --network none --tmpfs /var/lib/postgresql/data \
   -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_USER=reppen -e POSTGRES_DB=reppen "$image" >/dev/null
 ready=false
 for _ in $(seq 1 60); do
-  if docker exec "$id" pg_isready -U reppen -d reppen >/dev/null 2>&1; then ready=true; break; fi
+  if docker exec "$id" pg_isready -h 127.0.0.1 -U reppen -d reppen >/dev/null 2>&1; then ready=true; break; fi
   sleep 1
 done
 [ "$ready" = true ] || { echo 'isolated PostgreSQL did not start' >&2; exit 1; }
