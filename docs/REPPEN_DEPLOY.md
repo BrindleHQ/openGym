@@ -1,7 +1,7 @@
 # Optional Reppen deployment
 
-`deploy/environments.json` is the authoritative non-secret configuration. Staging is enabled
-with the verified core image; production remains disabled. To enable one, set its `reppen.image` to the actual merged
+`deploy/environments.json` is the authoritative non-secret configuration. Both environments
+are configured for the core image verified in official staging. To enable one, set its `reppen.image` to the actual merged
 core image's full `sha256:<64 hex>` Docker image ID (or registry `name@sha256:<64 hex>`),
 then set `enabled: true`. Missing pins and mutable tags are rejected. The rollout owner must
 build and load the merged core image and record its verified identity. The staging image was
