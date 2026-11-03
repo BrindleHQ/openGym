@@ -1,5 +1,6 @@
 // Swedish UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Confirm starting weights and equipment increments in lb (dumbbells per hand).': 'Bekräfta startvikter och utrustningens viktsteg i lb (hantlar per hand).',
   // --- generic ---
   'Confirm': 'Bekräfta',
   'Cancel': 'Avbryt',

@@ -1,0 +1,1866 @@
+{
+  "catalogId": "dorito-cut",
+  "artifactId": "sha256:78ab170e8f1398a4b853a972c000ce0731fdd3f8c9e3cfa1216362f5743b22aa",
+  "title": "Dorito Cut",
+  "days": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E"
+  ],
+  "defaultDay": "A",
+  "parameters": [
+    {
+      "name": "a_pulldown_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "a_pulldown",
+      "exerciseName": "Lat pulldown",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 58.9670081,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "a_pulldown_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "a_pulldown",
+      "exerciseName": "Lat pulldown",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "a_bench_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "a_bench",
+      "exerciseName": "Flat dumbbell bench press (each hand)",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 29.48350405,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "a_bench_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "a_bench",
+      "exerciseName": "Flat dumbbell bench press (each hand)",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "a_lateral_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "a_lateral",
+      "exerciseName": "Cable lateral raise",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 9.071847400000001,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "a_lateral_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "a_lateral",
+      "exerciseName": "Cable lateral raise",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "a_curl_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "a_curl",
+      "exerciseName": "Barbell curl",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 15.875732950000002,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "a_curl_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "a_curl",
+      "exerciseName": "Barbell curl",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "b_rdl_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "b_rdl",
+      "exerciseName": "Romanian deadlift",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 142.88159655,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "b_rdl_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "b_rdl",
+      "exerciseName": "Romanian deadlift",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "b_press_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "b_press",
+      "exerciseName": "Leg press — load pending setup",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "b_press_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "b_press",
+      "exerciseName": "Leg press — load pending setup",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "b_extension_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "b_extension",
+      "exerciseName": "Leg extension — load pending setup",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "b_extension_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "b_extension",
+      "exerciseName": "Leg extension — load pending setup",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "b_calf_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "b_calf",
+      "exerciseName": "Standing calf raise",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 34.01942775,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "b_calf_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "b_calf",
+      "exerciseName": "Standing calf raise",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "b_pushdown_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "b_pushdown",
+      "exerciseName": "Triceps pushdown",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 49.895160700000005,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "b_pushdown_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "b_pushdown",
+      "exerciseName": "Triceps pushdown",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "c_row_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "c_row",
+      "exerciseName": "Chest-supported dumbbell row (each hand)",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 24.947580350000003,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "c_row_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "c_row",
+      "exerciseName": "Chest-supported dumbbell row (each hand)",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "c_shoulder_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "c_shoulder",
+      "exerciseName": "Seated dumbbell shoulder press (each hand)",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 18.143694800000002,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "c_shoulder_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "c_shoulder",
+      "exerciseName": "Seated dumbbell shoulder press (each hand)",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "c_pulldown_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "c_pulldown",
+      "exerciseName": "Neutral-grip pulldown",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 58.9670081,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "c_pulldown_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "c_pulldown",
+      "exerciseName": "Neutral-grip pulldown",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "c_lateral_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "c_lateral",
+      "exerciseName": "Dumbbell lateral raise (each hand)",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 11.33980925,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "c_lateral_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "c_lateral",
+      "exerciseName": "Dumbbell lateral raise (each hand)",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "c_reverse_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "c_reverse",
+      "exerciseName": "Reverse pec deck",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 31.751465900000003,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "c_reverse_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "c_reverse",
+      "exerciseName": "Reverse pec deck",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "d_press_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "d_press",
+      "exerciseName": "Leg press — load pending setup",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "d_press_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "d_press",
+      "exerciseName": "Leg press — load pending setup",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "d_curl_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "d_curl",
+      "exerciseName": "Seated leg curl",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 31.751465900000003,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "d_curl_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "d_curl",
+      "exerciseName": "Seated leg curl",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "d_extension_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "d_extension",
+      "exerciseName": "Leg extension — load pending setup",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "d_extension_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "d_extension",
+      "exerciseName": "Leg extension — load pending setup",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "d_calf_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "d_calf",
+      "exerciseName": "Standing calf raise",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 34.01942775,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "d_calf_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "d_calf",
+      "exerciseName": "Standing calf raise",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "e_bench_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "e_bench",
+      "exerciseName": "Incline dumbbell bench press (each hand)",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 18.143694800000002,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "e_bench_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "e_bench",
+      "exerciseName": "Incline dumbbell bench press (each hand)",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "e_lateral_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "e_lateral",
+      "exerciseName": "Dumbbell lateral raise (each hand)",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 11.33980925,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "e_lateral_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "e_lateral",
+      "exerciseName": "Dumbbell lateral raise (each hand)",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "e_hammer_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "e_hammer",
+      "exerciseName": "Hammer curl (each hand)",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 11.33980925,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "e_hammer_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "e_hammer",
+      "exerciseName": "Hammer curl (each hand)",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "e_extension_starting_load",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "startingLoad",
+      "slot": "e_extension",
+      "exerciseName": "EZ-bar overhead triceps extension",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": 29.48350405,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    },
+    {
+      "name": "e_extension_increment",
+      "required": true,
+      "type": {
+        "t": "q",
+        "dim": {
+          "mass": 1
+        }
+      },
+      "purpose": "equipmentIncrement",
+      "slot": "e_extension",
+      "exerciseName": "EZ-bar overhead triceps extension",
+      "unit": "kg",
+      "displayUnit": "lb",
+      "knownValue": null,
+      "minimumExclusive": 0,
+      "requiresConfirmation": true
+    }
+  ],
+  "readings": [],
+  "questions": {
+    "quality_a_pulldown": {
+      "text": "Lat pulldown: was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "A",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_a_pulldown": {
+      "text": "Lat pulldown: explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "A",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_a_bench": {
+      "text": "Flat dumbbell bench press (each hand): was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "A",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_a_bench": {
+      "text": "Flat dumbbell bench press (each hand): explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "A",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_a_lateral": {
+      "text": "Cable lateral raise: was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "A",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_a_lateral": {
+      "text": "Cable lateral raise: explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "A",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_a_curl": {
+      "text": "Barbell curl: was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "A",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_a_curl": {
+      "text": "Barbell curl: explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "A",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_b_rdl": {
+      "text": "Romanian deadlift: was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "B",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_b_rdl": {
+      "text": "Romanian deadlift: explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "B",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_b_press": {
+      "text": "Leg press — load pending setup: was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "B",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_b_press": {
+      "text": "Leg press — load pending setup: explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "B",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_b_extension": {
+      "text": "Leg extension — load pending setup: was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "B",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_b_extension": {
+      "text": "Leg extension — load pending setup: explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "B",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_b_calf": {
+      "text": "Standing calf raise: was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "B",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_b_calf": {
+      "text": "Standing calf raise: explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "B",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_b_pushdown": {
+      "text": "Triceps pushdown: was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "B",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_b_pushdown": {
+      "text": "Triceps pushdown: explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "B",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_c_row": {
+      "text": "Chest-supported dumbbell row (each hand): was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "C",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_c_row": {
+      "text": "Chest-supported dumbbell row (each hand): explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "C",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_c_shoulder": {
+      "text": "Seated dumbbell shoulder press (each hand): was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "C",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_c_shoulder": {
+      "text": "Seated dumbbell shoulder press (each hand): explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "C",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_c_pulldown": {
+      "text": "Neutral-grip pulldown: was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "C",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_c_pulldown": {
+      "text": "Neutral-grip pulldown: explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "C",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_c_lateral": {
+      "text": "Dumbbell lateral raise (each hand): was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "C",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_c_lateral": {
+      "text": "Dumbbell lateral raise (each hand): explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "C",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_c_reverse": {
+      "text": "Reverse pec deck: was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "C",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_c_reverse": {
+      "text": "Reverse pec deck: explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "C",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_d_press": {
+      "text": "Leg press — load pending setup: was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "D",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_d_press": {
+      "text": "Leg press — load pending setup: explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "D",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_d_curl": {
+      "text": "Seated leg curl: was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "D",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_d_curl": {
+      "text": "Seated leg curl: explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "D",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_d_extension": {
+      "text": "Leg extension — load pending setup: was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "D",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_d_extension": {
+      "text": "Leg extension — load pending setup: explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "D",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_d_calf": {
+      "text": "Standing calf raise: was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "D",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_d_calf": {
+      "text": "Standing calf raise: explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "D",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_e_bench": {
+      "text": "Incline dumbbell bench press (each hand): was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "E",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_e_bench": {
+      "text": "Incline dumbbell bench press (each hand): explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "E",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_e_lateral": {
+      "text": "Dumbbell lateral raise (each hand): was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "E",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_e_lateral": {
+      "text": "Dumbbell lateral raise (each hand): explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "E",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_e_hammer": {
+      "text": "Hammer curl (each hand): was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "E",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_e_hammer": {
+      "text": "Hammer curl (each hand): explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "E",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "quality_e_extension": {
+      "text": "EZ-bar overhead triceps extension: was this complete work at comparable effort with comfortable technique?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "E",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "fifth_e_extension": {
+      "text": "EZ-bar overhead triceps extension: explicitly opt into five sets?",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingQuality",
+        "labels": {
+          "yes": "Yes",
+          "no": "No"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "day": "E",
+      "cases": {
+        "yes": {
+          "changes": []
+        },
+        "no": {
+          "changes": []
+        }
+      }
+    },
+    "recovery": {
+      "text": "Recovery status (good permits gradual rebuild after recovery week).",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingRecovery",
+        "labels": {
+          "good": "Good",
+          "poor": "Poor recovery or broad decline"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "cases": {
+        "good": {
+          "changes": []
+        },
+        "poor": {
+          "changes": []
+        }
+      }
+    },
+    "duration": {
+      "text": "Workout duration",
+      "answer": {
+        "kind": "enum",
+        "name": "coachingDuration",
+        "labels": {
+          "long": "Over 45 minutes",
+          "normal": "45 minutes or less"
+        }
+      },
+      "trigger": {
+        "kind": "finish"
+      },
+      "cases": {
+        "long": {
+          "changes": []
+        },
+        "normal": {
+          "changes": []
+        }
+      }
+    }
+  }
+}

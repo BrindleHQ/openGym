@@ -1,5 +1,6 @@
 // Ukrainian UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Confirm starting weights and equipment increments in lb (dumbbells per hand).': 'Підтвердьте початкові ваги та кроки навантаження обладнання у фунтах (гантелі на кожну руку).',
   'Confirm': 'Підтвердити',
   'Cancel': 'Скасувати',
   'Press back again to exit': 'Натисни «Назад» ще раз, щоб вийти',

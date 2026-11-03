@@ -28,6 +28,7 @@ import { useStore } from '../store/useStore.js'
 import { reppenStore } from './connection.js'
 import ReppenPrograms from './ReppenPrograms.jsx'
 import ReppenWorkout from './ReppenWorkout.jsx'
+import dorito from './dorito-fixture.json'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const mounted = []
@@ -65,6 +66,34 @@ beforeEach(async () => {
 afterEach(() => { act(() => { mounted.splice(0).forEach(r => r.unmount()) }); document.body.innerHTML = '' })
 
 describe('Reppen workout screens', () => {
+  it('renders every real Dorito quality, fifth-set, recovery and duration choice without skipping', async () => {
+    await reppenStore.getState().start('A1')
+    const host = await render(ReppenWorkout)
+    const questions = Object.entries(dorito.questions).map(([id, q]) => ({ id, occurrence: 'occ-' + id, text: q.text,
+      choices: Object.entries(q.answer.labels).map(([tag, label]) => ({ label, value: { v: 'enum', name: q.answer.name, tag } })) }))
+    const answer = vi.spyOn(reppenStore.getState(), 'answer').mockResolvedValue()
+    await act(async () => reppenStore.setState(s => ({ workout: { ...s.workout, pendingQuestions: questions } })))
+    expect(host.querySelectorAll('.rp-question')).toHaveLength(46)
+    expect(button(host, 'Finish workout').disabled).toBe(true)
+    for (const q of questions) {
+      const card = host.querySelector(`[data-question="${q.id}"]`)
+      expect(card.textContent).toContain(q.text)
+      for (const [i, choice] of q.choices.entries()) {
+        expect(card.querySelectorAll('button')[i].textContent).toBe(choice.label)
+        await act(async () => card.querySelectorAll('button')[i].click())
+        expect(answer).toHaveBeenLastCalledWith(q, choice)
+      }
+    }
+    answer.mockRestore()
+  })
+
+  it('explains online-required finish while disconnected even with no unsent sets', async () => {
+    await reppenStore.getState().start('A1')
+    const host = await render(ReppenWorkout)
+    await act(async () => reppenStore.setState({ offline: true, offlinePack: null, outbox: [] }))
+    expect(button(host, 'Finish workout').disabled).toBe(true)
+    expect(host.textContent).toContain('Connect to finish this workout. Your entries are saved on this device.')
+  })
   it('resets typed set drafts when continuing another workout', async () => {
     await reppenStore.getState().start('A1')
     await reppenStore.getState().start('B1')
@@ -132,6 +161,38 @@ describe('Reppen workout screens', () => {
     expect(disabled).toBe(true)
     expect(after).toBe(calls)
     expect(host.querySelector('.rp-finished')).toBeTruthy()
+  })
+
+  it('shows prescribed rest and RIR and retains issued units when the effective plan omits its stamp', async () => {
+    useStore.setState({ S: { ...useStore.getState().S, unit: 'lb' } })
+    await reppenStore.getState().start('A1')
+    const workout = structuredClone(reppenStore.getState().workout)
+    workout.plan.stamp = { display: { load: 'lb' } }
+    const effective = structuredClone(workout.effectivePlan || workout.plan)
+    delete effective.stamp
+    effective.slots[0].steps[0].sets[0].restSec = 120
+    effective.slots[0].steps[0].sets[0].metrics.effort = { k: 'fixed', v: { b: 'exact', v: 2 } }
+    workout.effectivePlan = effective
+    reppenStore.setState({ workout })
+    const host = await render(ReppenWorkout)
+    const set = row(host, 'squat|work|0')
+    expect(set.textContent).toContain('Rest (s): 120')
+    expect(set.textContent).toContain('2 RIR')
+    expect(set.textContent).toContain('102.5 lb')
+    expect(set.textContent).not.toContain('kg')
+  })
+
+  it('displays pounds but logs edited loads in the issued kilograms', async () => {
+    useStore.setState({ S: { ...useStore.getState().S, unit: 'lb' } })
+    await reppenStore.getState().start('A1')
+    const host = await render(ReppenWorkout)
+    const set = row(host, 'squat|work|0')
+    expect(set.textContent).toContain('225.97 lb')
+    await act(async () => type(set.querySelector('input[aria-label="lb"]'), '130'))
+    await click(set.querySelector('[role=checkbox]'))
+    const event = wire.sent.filter(r => r.path.endsWith('/events')).at(-1).body.events[0]
+    expect(event.values.load).toBeCloseTo(58.9670081, 8)
+    expect(set.querySelector('input[aria-label="lb"]').value).toBe('130')
   })
 
   it('runs a workout from start to history', async () => {

@@ -2,10 +2,10 @@
 // never derives one (no rounding, no progression); it shows what the effective plan says.
 
 /** A metric target as text: "102.5", "5+" (at least), "≤3", "8–12"; null when not fixed. */
-export function targetText(target) {
+export function targetText(target, convert = x => x) {
   if (!target || target.k !== 'fixed' || !target.v) return null
   const { b, v, lo, hi, min, max } = target.v
-  const n = x => (Number.isFinite(x) ? String(Math.round(x * 100) / 100) : null)
+  const n = x => (Number.isFinite(x) ? String(Math.round(convert(x) * 100) / 100) : null)
   if (b === 'exact') return n(v)
   if (b === 'atLeast') return n(v) && n(v) + '+'
   if (b === 'atMost') return n(v) && '≤' + n(v)

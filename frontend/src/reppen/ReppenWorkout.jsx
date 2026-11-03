@@ -11,22 +11,26 @@ import { reppenAvailable, reppenStore, useReppen } from './connection.js'
 import { loggedSets, metricOrder, posKey, startValue, targetText } from './plan.js'
 import { errorText } from './messages.js'
 import { exerciseName } from './store.js'
+import { LB_KG } from './setup.js'
 import { Held } from './ReppenPrograms.jsx'
 import OfflineStatus from './OfflineStatus.jsx'
 import './reppen.css'
 
 const actions = () => reppenStore.getState()
 
-const metricLabel = (m, unit) => (m === 'load' ? (unit || 'kg') : m === 'reps' ? t('Reps') : m)
+const metricLabel = (m, unit) => (m === 'load' ? (unit || 'kg') : m === 'reps' ? t('Reps') : m === 'effort' ? t('RIR') : m)
 const roleLabel = role => (role === 'amrap' ? t('AMRAP') : role === 'working' ? null : role)
+// Keep queued values in the issued plan's units. Conversion is only for fields and labels.
+const loadIn = (value, from, to) => value == null || from === to ? value
+  : value * (from === 'lb' ? LB_KG : 1) / (to === 'lb' ? LB_KG : 1)
 // How often the open runner catches up with other devices while it is shown.
 export const CATCH_UP_MS = 20000
 
 // This device's entry for a set another device logged first: what it was, and both ways out.
-function Draft({ draft, metrics, unit }) {
+function Draft({ draft, metrics, unit, sourceUnit }) {
   const { values } = draft.event
   const mine = draft.event.kind === 'setLogged'
-    ? metrics.filter(m => values?.[m] != null).map(m => `${values[m]} ${metricLabel(m, unit)}`).join(' × ') : t('cleared')
+    ? metrics.filter(m => values?.[m] != null).map(m => `${m === 'load' ? Number(loadIn(values[m], sourceUnit, unit).toFixed(8)) : values[m]} ${metricLabel(m, unit)}`).join(' × ') : t('cleared')
   return <div className="rp-draft" role="alert">
     <span>{t('Another device saved this set first. Yours was: {0}', mine)}</span>
     <Button size="sm" variant="tinted" onClick={() => actions().relogDraft(draft)}>{t('Save mine')}</Button>
@@ -34,13 +38,14 @@ function Draft({ draft, metrics, unit }) {
   </div>
 }
 
-function SetRow({ slot, step, set, index, number, logged, taken, unit, disabled }) {
+function SetRow({ slot, step, set, index, number, logged, taken, unit, sourceUnit, disabled }) {
   const metrics = metricOrder(set.metrics)
   const [draft, setDraft] = useState({})
   const done = !!logged
   // A logged set shows what Reppen holds, which may be another device's value, not what was typed
   // here, and a metric logged blank stays blank rather than falling back to the target.
   const value = m => (done ? logged.values?.[m] ?? null : m in draft ? draft[m] : startValue(set.metrics[m]))
+  const shown = m => m === 'load' && value(m) != null ? Number(loadIn(value(m), sourceUnit, unit).toFixed(8)) : value(m)
   const toggle = () => {
     if (done) return actions().clearSet(slot, step.key, index)
     const values = {}
@@ -51,16 +56,17 @@ function SetRow({ slot, step, set, index, number, logged, taken, unit, disabled 
   return <div className={'rp-set' + (done ? ' done' : '') + (logged?.pending ? ' pending' : '')} data-pos={posKey(slot, step.key, index)}>
     <span className="rp-n">{number}{role && <small>{role}</small>}</span>
     {metrics.map(m => <label key={m} className="rp-m">
-      <NumberField value={value(m)} nullable disabled={done || disabled} aria-label={metricLabel(m, unit)}
-        onChange={v => setDraft(d => ({ ...d, [m]: v }))} />
-      <span className="rp-t">{targetText(set.metrics[m]) ?? t('calculated')} {metricLabel(m, unit)}</span>
+      <NumberField value={shown(m)} nullable disabled={done || disabled} aria-label={metricLabel(m, unit)}
+        onChange={v => setDraft(d => ({ ...d, [m]: m === 'load' ? loadIn(v, unit, sourceUnit) : v }))} />
+      <span className="rp-t">{targetText(set.metrics[m], m === 'load' ? v => loadIn(v, sourceUnit, unit) : undefined) ?? t('calculated')} {metricLabel(m, unit)}</span>
     </label>)}
     <Check checked={done} disabled={disabled} label={t('Set {0} done', number)} onChange={toggle} />
-    {taken && <Draft draft={taken} metrics={metrics} unit={unit} />}
+    {Number.isFinite(set.restSec) && <small className="rp-rest">{t('Rest (s)')}: {set.restSec}</small>}
+    {taken && <Draft draft={taken} metrics={metrics} unit={unit} sourceUnit={sourceUnit} />}
   </div>
 }
 
-function SlotCard({ slot, logged, drafts, unit, disabled }) {
+function SlotCard({ slot, logged, drafts, unit, sourceUnit, disabled }) {
   const names = useReppen(s => s.exerciseNames)
   // Sets are numbered through the exercise, as on the app's own workout screen; each still logs
   // under its own step key and index.
@@ -72,7 +78,7 @@ function SlotCard({ slot, logged, drafts, unit, disabled }) {
     {slot.steps.map(step => <div key={step.key} className="rp-step" data-step={step.key}>
       {step.live && <p className="sect-f">{t('Reppen calculated these targets from the sets you logged.')}</p>}
       {step.sets.map((set, i) => <SetRow key={i} slot={slot.slot} step={step} set={set} index={i} number={++number}
-        logged={logged.get(posKey(slot.slot, step.key, i))} taken={drafts.get(posKey(slot.slot, step.key, i))} unit={unit} disabled={disabled} />)}
+        logged={logged.get(posKey(slot.slot, step.key, i))} taken={drafts.get(posKey(slot.slot, step.key, i))} unit={unit} sourceUnit={sourceUnit} disabled={disabled} />)}
     </div>)}
   </div>
 }
@@ -100,16 +106,26 @@ export default function ReppenWorkout() {
   const nav = useNavigate()
   const config = useStore(s => s.config)
   const user = useStore(s => s.user)
+  const preferredUnit = useStore(s => s.S?.unit)
   const workout = useReppen(s => s.workout)
   const outbox = useReppen(s => s.outbox)
   const rejected = useReppen(s => s.rejected)
   const error = useReppen(s => s.error)
   const busy = useReppen(s => s.busy)
+  const offline = useReppen(s => s.offline)
   const finished = useReppen(s => s.finished)
   const local = useReppen(s => s.local)
   const held = useReppen(s => s.held)
   const [loaded, setLoaded] = useState(false)
+  const [disconnected, setDisconnected] = useState(() => globalThis.navigator?.onLine === false)
   const ok = reppenAvailable(config, user)
+
+  useEffect(() => {
+    const update = () => setDisconnected(navigator.onLine === false)
+    window.addEventListener('online', update)
+    window.addEventListener('offline', update)
+    return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update) }
+  }, [])
 
   useEffect(() => {
     if (!ok) return
@@ -160,7 +176,8 @@ export default function ReppenWorkout() {
   const plan = workout?.effectivePlan || workout?.plan
   const logged = loggedSets(workout, outbox)
   const drafts = new Map(rejected.filter(r => r.code === 'setTaken').map(r => [posKey(r.event.slot, r.event.step, r.event.set), r]))
-  const unit = plan?.stamp?.display?.load
+  const stamp = plan?.stamp || workout?.plan?.stamp
+  const sourceUnit = stamp?.display?.load || 'kg'
   const questions = workout?.pendingQuestions || []
   const canFinishOffline = workout && actions().previewOfflineFinish().finish.k === 'finished'
   return <div className="narrow reppen">
@@ -171,12 +188,16 @@ export default function ReppenWorkout() {
     <OfflineStatus />
     {held && <Held held={held} nav={nav} />}
     {questions.map(q => <Question key={q.occurrence} q={q} />)}
-    {(plan?.slots || []).map(slot => <SlotCard key={workout.workoutId + ':' + slot.slot} slot={slot} logged={logged} drafts={drafts} unit={unit} disabled={busy} />)}
+    {(plan?.slots || []).map(slot => {
+      const issuedUnit = stamp?.slotGrids?.[slot.slot]?.display?.load || sourceUnit
+      const unit = ['kg', 'lb'].includes(issuedUnit) && ['kg', 'lb'].includes(preferredUnit) ? preferredUnit : issuedUnit
+      return <SlotCard key={workout.workoutId + ':' + slot.slot} slot={slot} logged={logged} drafts={drafts} unit={unit} sourceUnit={issuedUnit} disabled={busy} />
+    })}
     {workout && <div className="rp-finish">
-      <Button variant="filled" disabled={busy || questions.length > 0 || (outbox.length > 0 && !canFinishOffline)}
+      <Button variant="filled" disabled={busy || questions.length > 0 || ((disconnected || offline || outbox.length > 0) && !canFinishOffline)}
         onClick={async () => { await actions().finish() }}>{t('Finish workout')}</Button>
       {questions.length > 0 && <p className="sect-f">{t('Answer the open questions before finishing.')}</p>}
-      {outbox.length > 0 && !canFinishOffline && <p className="sect-f">{t('Connect to finish this workout. Your entries are saved on this device.')}</p>}
+      {(disconnected || offline || outbox.length > 0) && !canFinishOffline && <p className="sect-f">{t('Connect to finish this workout. Your entries are saved on this device.')}</p>}
     </div>}
   </div>
 }

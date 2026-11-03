@@ -1,4 +1,5 @@
 export default {
+  'Confirm starting weights and equipment increments in lb (dumbbells per hand).': '確認起始重量和器材的加重幅度，單位為磅（啞鈴為每手重量）。',
   'Confirm': '確認',
   'Cancel': '取消',
   'Press back again to exit': '再按一次返回以退出',

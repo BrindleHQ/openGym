@@ -97,7 +97,7 @@ export function withOfflineQueue(store, { client, owner, storage, today, newId, 
   function hydrate() {
     const account = owner()
     if (account === who && store.getState().localOwner === account) { base.hydrate(); return }
-    release?.(); release = null; epoch++; replaying = null; reconciling = null; persistError = null; unreadable = false
+    release?.(); release = null; epoch++; replaying = null; finishing = null; reconciling = null; persistError = null; unreadable = false
     loading = true; writable = false; who = account
     let saved = null
     try {
@@ -106,8 +106,22 @@ export function withOfflineQueue(store, { client, owner, storage, today, newId, 
       if (saved && (saved.version !== 1 || saved.owner !== account || !saved.data || !Array.isArray(saved.data.outbox) || !Array.isArray(saved.data.offlineJournal))) throw Error('Invalid offline journal')
     } catch { unreadable = true; persistError = fault('offlineStorage', 'Saved offline work could not be read. Keep this device open and recover it before continuing.'); saved = null }
     base.hydrate()
+    const baseLocal = store.getState().local
     store.setState(empty)
-    if (saved) store.setState(saved.data)
+    if (saved) {
+      const local = { ...saved.data.local }
+      // Either journal can retain the acknowledgment when the other's write fails.
+      // Match it to the pending ID; never roll back an offline-advanced nextDay.
+      if (baseLocal.enrollment?.enrollmentId && baseLocal.enrollment.enrollmentId === local.pendingEnrollment?.enrollmentId) {
+        local.enrollment = baseLocal.enrollment
+        local.nextDay = baseLocal.nextDay
+      }
+      // Pending requests are verified in the base journal before HTTP. Keep its
+      // exact request unless the snapshot already records that enrollment's ACK.
+      if (Object.hasOwn(baseLocal, 'pendingEnrollment')) local.pendingEnrollment = baseLocal.pendingEnrollment
+      if (local.pendingEnrollment?.enrollmentId && local.pendingEnrollment.enrollmentId === local.enrollment?.enrollmentId) local.pendingEnrollment = null
+      store.setState({ ...saved.data, local })
+    }
     base._rememberPending(store.getState().outbox, store.getState().workout?.revision || 0)
     loading = false
     const generation = epoch
@@ -272,8 +286,9 @@ export function withOfflineQueue(store, { client, owner, storage, today, newId, 
   }
   function finish() {
     if (finishing) return finishing
-    finishing = finishOnce().finally(() => { finishing = null })
-    return finishing
+    const promise = finishOnce().finally(() => { if (finishing === promise) finishing = null })
+    finishing = promise
+    return promise
   }
   store.setState({
     hydrate, flush, start, finish,
@@ -341,6 +356,7 @@ export function withOfflineQueue(store, { client, owner, storage, today, newId, 
     discardDraft(draft) { try { commit({ rejected: withoutDraft(store.getState().rejected, draft) }) } catch (e) { report(e) } },
     dismissRejected() { try { const s = store.getState(); commit({ rejected: s.workout ? s.rejected.filter(r => r.code === 'setTaken') : [] }) } catch (e) { report(e) } },
     answer(question, choice) { return enqueue({ kind: 'questionAnswered', question: question.id || question.question, occurrence: question.occurrence, value: choice.value }) },
+    _persistLocal(local) { write({ local }) },
     async enroll(...args) {
       try {
         await ensure()

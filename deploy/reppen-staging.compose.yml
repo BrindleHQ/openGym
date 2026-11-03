@@ -1,0 +1,97 @@
+# Isolated pre-merge proof on Boop Beep. No production/staging profile mounts.
+# Supply immutable local image IDs and ORIGIN via an external environment file.
+name: opengym-reppen-proof
+services:
+  postgres:
+    image: postgres:17.11@sha256:3b0cda93be7c8dba2ed484d19393d93845dc3dafb88973e248ba8e6d99d784e1
+    restart: unless-stopped
+    env_file: ./database.env
+    environment:
+      POSTGRES_USER: reppen
+      POSTGRES_DB: reppen
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U reppen -d reppen"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  api:
+    image: ${API_IMAGE:?API_IMAGE is required}
+    user: "10001:10001"
+    init: true
+    restart: unless-stopped
+    environment:
+      PORT: "3000"
+      DATA_DIR: /data
+      RP_ID: boop-beep.tail5728d8.ts.net
+      ORIGIN: ${ORIGIN:?ORIGIN is required}
+      RP_NAME: OpenGym Reppen staging proof
+      FIRST_USER_ADMIN: "1"
+      INVITE_ONLY: ${PROOF_INVITE_ONLY:-1}
+      ALLOW_GUEST: "0"
+      PASSWORD_LOGIN: "1"
+      COACH_DISABLED: "1"
+      SESSION_COOKIE: gymsid-reppen-proof
+      TRUST_PROXY: "1"
+      REPPEN_TOKEN_ISSUER: ${ORIGIN}
+      REPPEN_TOKEN_AUDIENCE: opengym-reppen-proof
+      REPPEN_API_URL: http://reppen:8080
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: [CMD, wget, --spider, -q, "http://127.0.0.1:3000/api/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  reppen:
+    image: ${REPPEN_IMAGE:?REPPEN_IMAGE is required}
+    restart: unless-stopped
+    env_file: ./database.env
+    environment:
+      REPPEN_AUTH_ISSUER: ${ORIGIN}
+      REPPEN_AUTH_AUDIENCE: opengym-reppen-proof
+      REPPEN_AUTH_JWKS_URL: http://api:3000/api/reppen/jwks
+      REPPEN_ERASURE_ENABLED: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -qO-, "http://127.0.0.1:8080/readyz"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  worker:
+    image: ${REPPEN_IMAGE:?REPPEN_IMAGE is required}
+    command: [reppen-worker]
+    restart: unless-stopped
+    env_file: ./database.env
+    environment:
+      REPPEN_WORKER_POLL_SECONDS: "1"
+    depends_on:
+      reppen:
+        condition: service_healthy
+  web:
+    image: ${WEB_IMAGE:?WEB_IMAGE is required}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:13831:8080"
+    environment:
+      NGINX_PORT: "8080"
+      BACKEND: api
+      PORT: "3000"
+      REPPEN_BACKEND: reppen:8080
+    depends_on:
+      api:
+        condition: service_healthy
+      reppen:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, --spider, -q, "http://127.0.0.1:8080/api/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  database:

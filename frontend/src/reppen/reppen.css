@@ -2,7 +2,8 @@
    are the app's own, only the set rows' layout is here. */
 .reppen .rp-slot h2,.reppen .rp-question h2,.reppen .rp-finished h2{margin:0 0 8px}
 .reppen .rp-step+.rp-step{border-top:.5px solid var(--sep);margin-top:6px;padding-top:6px}
-.reppen .rp-set{display:flex;align-items:center;gap:10px;padding:6px 0}
+.reppen .rp-set{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:6px 0}
+.reppen .rp-rest{flex-basis:100%;color:var(--label-2)}
 .reppen .rp-set.pending{opacity:.6}
 .reppen .rp-set.done .num{color:var(--label-2)}
 .reppen .rp-n{width:2.6em;font-weight:600;display:flex;flex-direction:column;line-height:1.1}
@@ -26,3 +27,6 @@
 .reppen .rp-draft{flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--label-2)}
 .reppen .rp-draft>span{flex:1 1 100%}
 .reppen .rp-draft .btn{width:auto;flex:1}
+.reppen .rp-setup{border:0;padding:12px 0;margin:8px 0;display:flex;gap:12px;flex-wrap:wrap}
+.reppen .rp-setup legend{font-weight:600;max-width:100%}
+.reppen .rp-setup .measure-field{flex:1 1 140px;min-width:0}

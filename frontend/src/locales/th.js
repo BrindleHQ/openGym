@@ -1,5 +1,6 @@
 // Thai UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Confirm starting weights and equipment increments in lb (dumbbells per hand).': 'ยืนยันน้ำหนักเริ่มต้นและขั้นการเพิ่มน้ำหนักอุปกรณ์เป็นปอนด์ (ดัมเบลต่อมือ)',
   // --- generic ---
   'Confirm': 'ยืนยัน',
   'Cancel': 'ยกเลิก',

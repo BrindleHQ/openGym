@@ -11,6 +11,7 @@ import { exerciseName, massReadings, unaskedParameters } from './store.js'
 import { errorText } from './messages.js'
 import OfflineStatus from './OfflineStatus.jsx'
 import { fmtDate } from '../lib/format.js'
+import { massParameters, initialSetup, validSetup, positive } from './setup.js'
 import './reppen.css'
 
 const actions = () => reppenStore.getState()
@@ -33,13 +34,28 @@ function EnrollForm({ entry, replaces, onDone }) {
   const names = useReppen(s => s.exerciseNames)
   const readings = massReadings(entry)
   const [kg, setKg] = useState({})
+  const [setup, setSetup] = useState(() => initialSetup(entry))
+  const [confirmed, setConfirmed] = useState(false)
+  const parameters = massParameters(entry)
+  const slots = [...new Set(parameters.map(p => p.slot))]
   const blocked = cannotEnroll(entry)
-  const missing = !retry && readings.some((r, i) => r.required && !(kg[i] > 0))
-  const submit = async () => { if (await actions().enroll(entry, kg)) onDone() }
+  const missing = !retry && (readings.some((r, i) => (r.required || kg[i] != null) && !positive(kg[i])) || !validSetup(entry, setup, confirmed))
+  const submit = async () => { if (await actions().enroll(entry, kg, setup, confirmed)) onDone() }
   return <div className="card reppen-enroll" data-catalog-id={entry.catalogId}>
     <h2>{entry.title}</h2>
     {readings.length > 0 && <p className="sect-f">{t('Enter your current numbers. The program sets your first weights from them.')}</p>}
     {retry && <p className="sect-f">{t('Retrying confirms the original enrollment request and readings.')}</p>}
+    {slots.map(slot => <fieldset key={slot} className="rp-setup">
+      <legend>{t('Day {0}', slot.split('_')[0].toUpperCase())} · {parameters.find(p => p.slot === slot).exerciseName}</legend>
+      {parameters.filter(p => p.slot === slot).map(p => <label key={p.name} className="measure-field">
+        <span>{p.purpose === 'startingLoad' ? t('Weight ({0})', 'lb') : t('Step ({0})', 'lb')}</span>
+        <NumberField nullable value={(retry ? pending.setup?.[p.name] : setup[p.name]) ?? null} disabled={retry}
+          aria-label={`${p.exerciseName} ${p.purpose === 'startingLoad' ? t('Weight ({0})', 'lb') : t('Step ({0})', 'lb')}`}
+          onChange={v => { setSetup(prev => ({ ...prev, [p.name]: v })); setConfirmed(false) }} />
+      </label>)}
+    </fieldset>)}
+    {parameters.length > 0 && <label><input type="checkbox" checked={retry ? !!pending.confirmed : confirmed} disabled={retry}
+      onChange={e => setConfirmed(e.target.checked)} />{t('Confirm starting weights and equipment increments in lb (dumbbells per hand).')}</label>}
     {readings.length > 0 && <div className="measure-form rp-readings">
       {readings.map((r, i) => <label key={i} className="measure-field rp-reading" data-key={r.key}>
         <span>{r.key ? exerciseName(names, r.key) : readingLabel(r)}</span>
