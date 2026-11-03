@@ -2674,4 +2674,5 @@ export default {
   'Your Reppen data is being deleted.': 'Dina Reppen-data raderas.',
   'Your program': 'Ditt program',
   'calculated': 'beräknat',
+  'Your Reppen program saved this workout. It cannot be changed here.': 'Ditt Reppen-program sparade det här passet. Det går inte att ändra här.',
 }

@@ -2630,4 +2630,5 @@ export default {
   'Your Reppen data is being deleted.': 'A Reppen-adataid törlése folyamatban van.',
   'Your program': 'A programod',
   'calculated': 'számított',
+  'Your Reppen program saved this workout. It cannot be changed here.': 'Ezt az edzést a Reppen-programod mentette. Itt nem módosítható.',
 }
