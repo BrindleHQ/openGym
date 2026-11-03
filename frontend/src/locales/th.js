@@ -2642,4 +2642,11 @@ export default {
   'Another device saved this set first. Yours was: {0}': 'อุปกรณ์อื่นบันทึกเซ็ตนี้ก่อน ของคุณคือ: {0}',
   'Save mine': 'บันทึกของฉัน',
   'cleared': 'ล้างแล้ว',
+  "Connect to finish this workout. Your entries are saved on this device.": "เชื่อมต่อเพื่อจบการฝึกนี้ ข้อมูลของคุณบันทึกไว้ในอุปกรณ์นี้แล้ว",
+  "Download saved offline entries": "ดาวน์โหลดข้อมูลออฟไลน์ที่บันทึกไว้",
+  "It will enter your history after Reppen verifies it on sync.": "การฝึกจะปรากฏในประวัติหลังจาก Reppen ตรวจสอบขณะซิงค์",
+  "Saved on this device. Waiting to sync.": "บันทึกไว้ในอุปกรณ์นี้แล้ว กำลังรอซิงค์",
+  "The server result differs. Your offline entries are kept on this device.": "ผลลัพธ์จากเซิร์ฟเวอร์แตกต่างกัน ข้อมูลออฟไลน์ของคุณยังอยู่ในอุปกรณ์นี้",
+  "The server result differs. Your offline entries are kept on this device; reconnect to reconcile them.": "ผลลัพธ์จากเซิร์ฟเวอร์แตกต่างกัน ข้อมูลออฟไลน์ของคุณยังอยู่ในอุปกรณ์นี้ เชื่อมต่ออีกครั้งเพื่อปรับข้อมูลให้ตรงกัน",
+  "Use server workout and keep a recovery copy": "ใช้การฝึกจากเซิร์ฟเวอร์และเก็บสำเนาสำหรับกู้คืน",
 }

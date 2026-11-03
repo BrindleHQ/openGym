@@ -13,8 +13,16 @@ import { addManaged, hasManaged, managedWorkout } from './history.js'
 import { useStore as useZustand } from 'zustand'
 import { todayISO } from '../lib/format.js'
 
-export const reppenAvailable = (config, user, { mobile = MOBILE, demo = DEMO } = {}) =>
-  !mobile && !demo && !!(config?.reppen === true && user?.id)
+export const reppenAvailable = (config, user, { mobile = MOBILE, demo = DEMO, storage = globalThis.localStorage } = {}) => {
+  if (mobile || demo || !user?.id) return false
+  if (config != null) return config.reppen === true
+  // During a complete outage the public config cannot be fetched. Only the
+  // cached account's own enrollment may keep its already-enabled runner open.
+  try {
+    const kept = JSON.parse(storage.getItem(`reppen.offline.v1.${user.id}`))
+    return !!(kept?.version === 1 && kept.owner === user.id && kept.data?.local?.enrollment)
+  } catch { return false }
+}
 
 const tokens = tokenSource({ mint: () => api('/api/reppen/token', { method: 'POST' }) })
 
@@ -39,5 +47,6 @@ function recordFinished(result, { title, names }) {
 }
 
 export const reppenStore = createReppenStore({ client: reppen, owner: () => useStore.getState().user?.id, today: todayISO, recordFinished })
+if (import.meta.hot) import.meta.hot.dispose(() => reppenStore.getState()._disposeOffline())
 /** The Reppen store in a component, the way useStore is used everywhere else. */
 export const useReppen = selector => useZustand(reppenStore, selector)

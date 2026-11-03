@@ -2686,4 +2686,11 @@ export default {
   'Another device saved this set first. Yours was: {0}': 'حفظ جهاز آخر هذه المجموعة أولًا. قيمتك كانت: {0}',
   'Save mine': 'احفظ قيمتي',
   'cleared': 'مُسحت',
+  "Connect to finish this workout. Your entries are saved on this device.": "اتصل بالإنترنت لإنهاء هذا التمرين. إدخالاتك محفوظة على هذا الجهاز.",
+  "Download saved offline entries": "تنزيل الإدخالات المحفوظة دون اتصال",
+  "It will enter your history after Reppen verifies it on sync.": "سيظهر في سجلك بعد أن يتحقق منه Reppen عند المزامنة.",
+  "Saved on this device. Waiting to sync.": "محفوظ على هذا الجهاز. في انتظار المزامنة.",
+  "The server result differs. Your offline entries are kept on this device.": "تختلف نتيجة الخادم. إدخالاتك دون اتصال محفوظة على هذا الجهاز.",
+  "The server result differs. Your offline entries are kept on this device; reconnect to reconcile them.": "تختلف نتيجة الخادم. إدخالاتك دون اتصال محفوظة على هذا الجهاز؛ أعد الاتصال لمطابقتها.",
+  "Use server workout and keep a recovery copy": "استخدام تمرين الخادم والاحتفاظ بنسخة للاسترداد",
 }

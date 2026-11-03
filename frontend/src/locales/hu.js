@@ -2634,4 +2634,11 @@ export default {
   'Another device saved this set first. Yours was: {0}': 'Egy másik eszköz előbb mentette ezt a sorozatot. A tiéd ez volt: {0}',
   'Save mine': 'Az enyém mentése',
   'cleared': 'törölve',
+  "Connect to finish this workout. Your entries are saved on this device.": "Csatlakozz az edzés befejezéséhez. A bejegyzéseid ezen az eszközön vannak mentve.",
+  "Download saved offline entries": "Mentett offline bejegyzések letöltése",
+  "It will enter your history after Reppen verifies it on sync.": "A Reppen szinkronizáláskor ellenőrzi, majd megjelenik az előzményekben.",
+  "Saved on this device. Waiting to sync.": "Ezen az eszközön mentve. Szinkronizálásra vár.",
+  "The server result differs. Your offline entries are kept on this device.": "A szerver eredménye eltér. Az offline bejegyzéseid megmaradnak ezen az eszközön.",
+  "The server result differs. Your offline entries are kept on this device; reconnect to reconcile them.": "A szerver eredménye eltér. Az offline bejegyzéseid megmaradnak ezen az eszközön; csatlakozz újra az egyeztetéshez.",
+  "Use server workout and keep a recovery copy": "A szerver edzésének használata és helyreállítási másolat megtartása",
 }

@@ -145,6 +145,7 @@ describe('Reppen store: programs', () => {
     const enroll = vi.fn(() => new Promise(r => { answer = r }))
     const { store, storage, who } = setup(fakeClient({ enroll }))
     const pending = store.getState().enroll(GZCLP, { 0: 1, 1: 1 })
+    await vi.waitFor(() => expect(answer).toBeTypeOf('function'))
     who.id = 'u2'
     store.getState().hydrate()
     answer({ enrollmentId: 'e' })

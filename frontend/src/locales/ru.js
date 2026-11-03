@@ -2635,4 +2635,11 @@ export default {
   'Another device saved this set first. Yours was: {0}': 'Другое устройство сохранило этот подход первым. Ваш был: {0}',
   'Save mine': 'Сохранить мой',
   'cleared': 'очищен',
+  "Connect to finish this workout. Your entries are saved on this device.": "Подключитесь, чтобы завершить тренировку. Ваши записи сохранены на этом устройстве.",
+  "Download saved offline entries": "Скачать сохранённые офлайн-записи",
+  "It will enter your history after Reppen verifies it on sync.": "Тренировка появится в истории после проверки Reppen при синхронизации.",
+  "Saved on this device. Waiting to sync.": "Сохранено на этом устройстве. Ожидает синхронизации.",
+  "The server result differs. Your offline entries are kept on this device.": "Результат сервера отличается. Ваши офлайн-записи остаются на этом устройстве.",
+  "The server result differs. Your offline entries are kept on this device; reconnect to reconcile them.": "Результат сервера отличается. Ваши офлайн-записи остаются на этом устройстве; подключитесь для согласования.",
+  "Use server workout and keep a recovery copy": "Использовать тренировку с сервера и сохранить копию для восстановления",
 }

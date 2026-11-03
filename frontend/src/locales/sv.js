@@ -2678,4 +2678,11 @@ export default {
   'Another device saved this set first. Yours was: {0}': 'En annan enhet sparade det här setet först. Ditt var: {0}',
   'Save mine': 'Spara mitt',
   'cleared': 'rensat',
+  "Connect to finish this workout. Your entries are saved on this device.": "Anslut för att avsluta passet. Dina registreringar finns sparade på den här enheten.",
+  "Download saved offline entries": "Hämta sparade offlineregistreringar",
+  "It will enter your history after Reppen verifies it on sync.": "Passet visas i historiken när Reppen har verifierat det vid synkronisering.",
+  "Saved on this device. Waiting to sync.": "Sparat på den här enheten. Väntar på synkronisering.",
+  "The server result differs. Your offline entries are kept on this device.": "Serverns resultat skiljer sig. Dina offlineregistreringar finns kvar på den här enheten.",
+  "The server result differs. Your offline entries are kept on this device; reconnect to reconcile them.": "Serverns resultat skiljer sig. Dina offlineregistreringar finns kvar på den här enheten; anslut igen för att stämma av dem.",
+  "Use server workout and keep a recovery copy": "Använd serverns pass och behåll en återställningskopia",
 }

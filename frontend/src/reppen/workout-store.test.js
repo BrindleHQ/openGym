@@ -135,10 +135,16 @@ describe('Reppen store: a workout', () => {
     const second = laptop.getState().workout.workoutId
     await phone.getState().start('A1')
     await phone.getState().continueActive()
+    // The durable queue blocks a switch until the pending command is reconciled.
+    expect(phone.getState().workout.workoutId).toBe(first)
+    expect(phone.getState().error.code).toBe('offlineConflict')
     w.afterEvents(null)
     if (release) { release(); await logging }
+    await phone.getState().flush()
+    await phone.getState().catchUp()
+    await phone.getState().continueActive()
     expect(phone.getState().workout.workoutId).toBe(second)
-    expect(phone.getState().rejected).toContainEqual({ workoutId: first, event, code: 'workoutChanged' })
+    expect(phone.getState().outbox).toEqual([])
     await phone.getState().logSet('bench', 'work', 0, { load: 50, reps: 10 })
     expect((await w.client.workout(second)).events.some(e => e.id === event.id)).toBe(false)
     expect((await w.client.workout(first)).events.some(e => e.id === event.id)).toBe(true)
@@ -574,4 +580,3 @@ describe('Reppen store: two devices on one workout', () => {
     expect(laptop.getState().workout.revision).toBe(1)
   })
 })
-

@@ -10,6 +10,8 @@ export function errorText(e) {
   if (refusal === 'emptySession') return t('Log at least one set before finishing.')
   if (refusal) return t('Reppen refused this: {0}', refusal)
   switch (e.code) {
+    case 'offlineStorage': case 'offlineQueueBusy': case 'offlineConflict': case 'needsConnection': return e.message
+    case 'offlineMismatch': case 'offlineVerificationUnavailable': return t('The server result differs. Your offline entries are kept on this device; reconnect to reconcile them.')
     case 'offline': return t('Reppen could not be reached. Check your connection and try again.')
     case 'unauthenticated': case 'http401': return t('Reppen did not accept your sign-in. Sign in again and retry.')
     case 'enrollmentNotFound': return t('Reppen no longer has this program enrollment.')

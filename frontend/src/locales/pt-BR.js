@@ -1697,6 +1697,13 @@ export const PT_BR_OVERRIDES = {
   'Your Reppen program saved this workout. It cannot be changed here.': 'Seu programa Reppen salvou este treino. Ele não pode ser alterado aqui.',
   'Another device saved this set first. Yours was: {0}': 'Outro dispositivo salvou esta série primeiro. A sua era: {0}',
   'Save mine': 'Salvar a minha',
+  "Connect to finish this workout. Your entries are saved on this device.": "Conecte-se para terminar este treino. Seus registros estão salvos neste dispositivo.",
+  "Download saved offline entries": "Baixar registros offline salvos",
+  "It will enter your history after Reppen verifies it on sync.": "Aparecerá no histórico após a verificação do Reppen durante a sincronização.",
+  "Saved on this device. Waiting to sync.": "Salvo neste dispositivo. Aguardando sincronização.",
+  "The server result differs. Your offline entries are kept on this device.": "O resultado do servidor é diferente. Seus registros offline continuam neste dispositivo.",
+  "The server result differs. Your offline entries are kept on this device; reconnect to reconcile them.": "O resultado do servidor é diferente. Seus registros offline continuam neste dispositivo; reconecte-se para reconciliá-los.",
+  "Use server workout and keep a recovery copy": "Usar o treino do servidor e manter uma cópia de recuperação",
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

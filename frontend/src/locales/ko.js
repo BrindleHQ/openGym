@@ -2631,4 +2631,11 @@ export default {
   'Another device saved this set first. Yours was: {0}': '다른 기기가 이 세트를 먼저 저장했어요. 내 기록: {0}',
   'Save mine': '내 기록 저장',
   'cleared': '지움',
+  "Connect to finish this workout. Your entries are saved on this device.": "운동을 완료하려면 연결하세요. 기록은 이 기기에 저장되어 있습니다.",
+  "Download saved offline entries": "저장된 오프라인 기록 다운로드",
+  "It will enter your history after Reppen verifies it on sync.": "동기화할 때 Reppen이 확인하면 운동 기록에 추가됩니다.",
+  "Saved on this device. Waiting to sync.": "이 기기에 저장되었습니다. 동기화 대기 중입니다.",
+  "The server result differs. Your offline entries are kept on this device.": "서버 결과가 다릅니다. 오프라인 기록은 이 기기에 보관됩니다.",
+  "The server result differs. Your offline entries are kept on this device; reconnect to reconcile them.": "서버 결과가 다릅니다. 오프라인 기록은 이 기기에 보관됩니다. 다시 연결하여 기록을 조정하세요.",
+  "Use server workout and keep a recovery copy": "서버의 운동을 사용하고 복구 사본 보관",
 }

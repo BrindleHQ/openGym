@@ -40,7 +40,7 @@ const seg = s => encodeURIComponent(String(s))
 export function reppenClient({ base, token, fetch: doFetch = (...a) => globalThis.fetch(...a) }) {
   async function send(method, path, body, bearer, extra = {}) {
     const ctl = new AbortController()
-    const timer = setTimeout(() => ctl.abort(), method === 'GET' ? TIMEOUT_GET_MS : TIMEOUT_MS)
+    const timer = setTimeout(() => ctl.abort(), extra.timeoutMs || (method === 'GET' ? TIMEOUT_GET_MS : TIMEOUT_MS))
     try {
       const r = await doFetch(base() + 'v1/' + path, {
         method,
@@ -56,6 +56,7 @@ export function reppenClient({ base, token, fetch: doFetch = (...a) => globalThi
         if (ctl.signal.aborted) throw new ReppenError(0, null, 'Reppen could not be reached')
         // A non-JSON response is judged below; an aborted body is a connection failure.
       }
+      if ([502, 503, 504].includes(r.status) && !data?.error) throw new ReppenError(0, null, 'Reppen could not be reached')
       if (!r.ok) throw new ReppenError(r.status, data && typeof data === 'object' ? data : null)
       if (!data || typeof data !== 'object') throw new ReppenError(r.status, null, 'Reppen answered with something other than JSON')
       return extra.catalog ? { catalog: data, etag: r.headers.get('ETag') } : data
@@ -82,7 +83,7 @@ export function reppenClient({ base, token, fetch: doFetch = (...a) => globalThi
       return run(await getToken({ fresh: true }))
     }
   }
-  const call = (method, path, body) => authed(bearer => send(method, path, body, bearer))
+  const call = (method, path, body, extra) => authed(bearer => send(method, path, body, bearer, extra))
 
   return {
     catalog: (cursor = null) => call('GET', 'program-catalog?limit=100' + (cursor ? '&cursor=' + seg(cursor) : '')),
@@ -97,10 +98,11 @@ export function reppenClient({ base, token, fetch: doFetch = (...a) => globalThi
     /** @param {{ artifactId: string, startOn: string, params?: object, readings?: object[] }} body */
     enroll: (id, body) => call('PUT', 'enrollments/' + seg(id), body),
     workout: id => call('GET', 'workouts/' + seg(id)),
+    offlinePack: id => call('GET', 'workouts/' + seg(id) + '/offline-pack', undefined, { timeoutMs: 120000 }),
     /** @param {{ enrollmentId: string, enrollmentRevision: number, localDay: string, day: string }} body */
     startWorkout: (id, body) => call('PUT', 'workouts/' + seg(id), body),
-    appendEvents: (id, expectedRevision, events) => call('POST', 'workouts/' + seg(id) + '/events', { expectedRevision, events }),
-    finish: (id, expectedRevision) => call('POST', 'workouts/' + seg(id) + '/finish', { expectedRevision }),
+    appendEvents: (id, expectedRevision, events, offlineComputed) => call('POST', 'workouts/' + seg(id) + '/events', { expectedRevision, events, ...(offlineComputed?.length ? { offlineComputed } : {}) }),
+    finish: (id, expectedRevision, offlineState) => call('POST', 'workouts/' + seg(id) + '/finish', { expectedRevision, ...(offlineState ? { offlineState } : {}) }),
     activate: (id, replaces) => call('POST', 'workouts/' + seg(id) + '/activate', { replaces: replaces ?? null }),
     history: (cursor = null) => call('GET', 'history?limit=50' + (cursor ? '&cursor=' + seg(cursor) : '')),
   }

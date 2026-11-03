@@ -1,0 +1,2663 @@
+{
+  "envelope": {
+    "workoutId": "offline-w",
+    "artifactId": "sha256:8689a7272e5d5476844a61f665813cb1594473f1aa89847f88bddd2850932d4c",
+    "enrollmentId": "offline-e",
+    "workoutRevision": 0,
+    "enrollmentRevision": 0,
+    "localDay": "2026-10-05",
+    "pack": {
+      "format": "reppen.residual/1",
+      "nodes": [
+        {
+          "plan": {
+            "day": "A1",
+            "defaultDay": "A1",
+            "slots": [
+              {
+                "slot": "squat",
+                "exercise": {
+                  "id": "wger:111",
+                  "label": "Barbell Back Squat",
+                  "logging": "weight_reps"
+                },
+                "steps": [
+                  {
+                    "id": "work",
+                    "key": "work",
+                    "count": {
+                      "k": "n",
+                      "n": 4.0
+                    },
+                    "sets": [
+                      {
+                        "role": "working",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 102.5
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      },
+                      {
+                        "role": "working",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 102.5
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      },
+                      {
+                        "role": "working",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 102.5
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      },
+                      {
+                        "role": "working",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 102.5
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      }
+                    ],
+                    "block": null,
+                    "live": null
+                  },
+                  {
+                    "id": "last",
+                    "key": "last",
+                    "count": {
+                      "k": "n",
+                      "n": 1.0
+                    },
+                    "sets": [
+                      {
+                        "role": "amrap",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "atLeast",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 102.5
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      }
+                    ],
+                    "block": null,
+                    "live": null
+                  }
+                ],
+                "intensifier": null
+              }
+            ]
+          },
+          "targets": [],
+          "occurrences": [],
+          "finish": {
+            "k": "residual",
+            "refuseIf": {
+              "op": "not",
+              "a": {
+                "op": "or",
+                "a": {
+                  "op": "gt",
+                  "a": {
+                    "op": "agg",
+                    "fn": "count",
+                    "sets": {
+                      "slot": "squat",
+                      "step": "work"
+                    }
+                  },
+                  "b": {
+                    "op": "num",
+                    "v": 0.0
+                  }
+                },
+                "b": {
+                  "op": "gt",
+                  "a": {
+                    "op": "agg",
+                    "fn": "count",
+                    "sets": {
+                      "slot": "squat",
+                      "step": "last"
+                    }
+                  },
+                  "b": {
+                    "op": "num",
+                    "v": 0.0
+                  }
+                }
+              }
+            },
+            "slots": [
+              {
+                "slot": "squat",
+                "state": {
+                  "stage": {
+                    "v": "enum",
+                    "name": "gzT1",
+                    "tag": "5x3"
+                  },
+                  "load": {
+                    "v": "q",
+                    "n": 102.0,
+                    "dim": {
+                      "mass": 1
+                    },
+                    "unit": "kg"
+                  }
+                },
+                "branches": [
+                  {
+                    "k": "patch",
+                    "when": {
+                      "op": "not",
+                      "a": {
+                        "op": "or",
+                        "a": {
+                          "op": "gt",
+                          "a": {
+                            "op": "agg",
+                            "fn": "count",
+                            "sets": {
+                              "slot": "squat",
+                              "step": "work"
+                            }
+                          },
+                          "b": {
+                            "op": "num",
+                            "v": 0.0
+                          }
+                        },
+                        "b": {
+                          "op": "gt",
+                          "a": {
+                            "op": "agg",
+                            "fn": "count",
+                            "sets": {
+                              "slot": "squat",
+                              "step": "last"
+                            }
+                          },
+                          "b": {
+                            "op": "num",
+                            "v": 0.0
+                          }
+                        }
+                      }
+                    },
+                    "set": {}
+                  },
+                  {
+                    "k": "patch",
+                    "when": {
+                      "op": "or",
+                      "a": {
+                        "op": "or",
+                        "a": {
+                          "op": "agg",
+                          "fn": "any",
+                          "sets": {
+                            "slot": "squat",
+                            "step": "work"
+                          },
+                          "where": {
+                            "op": "and",
+                            "a": {
+                              "op": "not",
+                              "a": {
+                                "op": "isNone",
+                                "a": {
+                                  "op": "item",
+                                  "metric": "load"
+                                }
+                              }
+                            },
+                            "b": {
+                              "op": "not",
+                              "a": {
+                                "op": "ge",
+                                "a": {
+                                  "op": "item",
+                                  "metric": "load"
+                                },
+                                "b": {
+                                  "op": "num",
+                                  "v": 102.5
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "b": {
+                          "op": "and",
+                          "a": {
+                            "op": "not",
+                            "a": {
+                              "op": "isNone",
+                              "a": {
+                                "op": "at",
+                                "sets": {
+                                  "slot": "squat",
+                                  "step": "last"
+                                },
+                                "i": 0,
+                                "by": "position",
+                                "metric": "load"
+                              }
+                            }
+                          },
+                          "b": {
+                            "op": "not",
+                            "a": {
+                              "op": "ge",
+                              "a": {
+                                "op": "at",
+                                "sets": {
+                                  "slot": "squat",
+                                  "step": "last"
+                                },
+                                "i": 0,
+                                "by": "position",
+                                "metric": "load"
+                              },
+                              "b": {
+                                "op": "num",
+                                "v": 102.5
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "b": {
+                        "op": "and",
+                        "a": {
+                          "op": "not",
+                          "a": {
+                            "op": "ge",
+                            "a": {
+                              "op": "add",
+                              "a": {
+                                "op": "agg",
+                                "fn": "sum",
+                                "sets": {
+                                  "slot": "squat",
+                                  "step": "work"
+                                },
+                                "of": {
+                                  "op": "item",
+                                  "metric": "reps"
+                                }
+                              },
+                              "b": {
+                                "op": "if",
+                                "c": {
+                                  "op": "isNone",
+                                  "a": {
+                                    "op": "at",
+                                    "sets": {
+                                      "slot": "squat",
+                                      "step": "last"
+                                    },
+                                    "i": 0,
+                                    "by": "position",
+                                    "metric": "reps"
+                                  }
+                                },
+                                "a": {
+                                  "op": "num",
+                                  "v": 0.0
+                                },
+                                "b": {
+                                  "op": "at",
+                                  "sets": {
+                                    "slot": "squat",
+                                    "step": "last"
+                                  },
+                                  "i": 0,
+                                  "by": "position",
+                                  "metric": "reps"
+                                }
+                              }
+                            },
+                            "b": {
+                              "op": "num",
+                              "v": 15.0
+                            }
+                          }
+                        },
+                        "b": {
+                          "op": "and",
+                          "a": {
+                            "op": "not",
+                            "a": {
+                              "op": "lt",
+                              "a": {
+                                "op": "agg",
+                                "fn": "count",
+                                "sets": {
+                                  "slot": "squat",
+                                  "step": "work"
+                                },
+                                "where": {
+                                  "op": "not",
+                                  "a": {
+                                    "op": "isNone",
+                                    "a": {
+                                      "op": "item",
+                                      "metric": "reps"
+                                    }
+                                  }
+                                }
+                              },
+                              "b": {
+                                "op": "num",
+                                "v": 4.0
+                              }
+                            }
+                          },
+                          "b": {
+                            "op": "not",
+                            "a": {
+                              "op": "isNone",
+                              "a": {
+                                "op": "at",
+                                "sets": {
+                                  "slot": "squat",
+                                  "step": "last"
+                                },
+                                "i": 0,
+                                "by": "position",
+                                "metric": "reps"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "set": {
+                      "stage": {
+                        "mode": "commit",
+                        "value": {
+                          "v": "enum",
+                          "name": "gzT1",
+                          "tag": "6x2"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "k": "patch",
+                    "when": {
+                      "op": "or",
+                      "a": {
+                        "op": "or",
+                        "a": {
+                          "op": "lt",
+                          "a": {
+                            "op": "agg",
+                            "fn": "count",
+                            "sets": {
+                              "slot": "squat",
+                              "step": "work"
+                            },
+                            "where": {
+                              "op": "not",
+                              "a": {
+                                "op": "isNone",
+                                "a": {
+                                  "op": "item",
+                                  "metric": "load"
+                                }
+                              }
+                            }
+                          },
+                          "b": {
+                            "op": "num",
+                            "v": 4.0
+                          }
+                        },
+                        "b": {
+                          "op": "isNone",
+                          "a": {
+                            "op": "at",
+                            "sets": {
+                              "slot": "squat",
+                              "step": "last"
+                            },
+                            "i": 0,
+                            "by": "position",
+                            "metric": "load"
+                          }
+                        }
+                      },
+                      "b": {
+                        "op": "and",
+                        "a": {
+                          "op": "not",
+                          "a": {
+                            "op": "ge",
+                            "a": {
+                              "op": "add",
+                              "a": {
+                                "op": "agg",
+                                "fn": "sum",
+                                "sets": {
+                                  "slot": "squat",
+                                  "step": "work"
+                                },
+                                "of": {
+                                  "op": "item",
+                                  "metric": "reps"
+                                }
+                              },
+                              "b": {
+                                "op": "if",
+                                "c": {
+                                  "op": "isNone",
+                                  "a": {
+                                    "op": "at",
+                                    "sets": {
+                                      "slot": "squat",
+                                      "step": "last"
+                                    },
+                                    "i": 0,
+                                    "by": "position",
+                                    "metric": "reps"
+                                  }
+                                },
+                                "a": {
+                                  "op": "num",
+                                  "v": 0.0
+                                },
+                                "b": {
+                                  "op": "at",
+                                  "sets": {
+                                    "slot": "squat",
+                                    "step": "last"
+                                  },
+                                  "i": 0,
+                                  "by": "position",
+                                  "metric": "reps"
+                                }
+                              }
+                            },
+                            "b": {
+                              "op": "num",
+                              "v": 15.0
+                            }
+                          }
+                        },
+                        "b": {
+                          "op": "not",
+                          "a": {
+                            "op": "and",
+                            "a": {
+                              "op": "not",
+                              "a": {
+                                "op": "lt",
+                                "a": {
+                                  "op": "agg",
+                                  "fn": "count",
+                                  "sets": {
+                                    "slot": "squat",
+                                    "step": "work"
+                                  },
+                                  "where": {
+                                    "op": "not",
+                                    "a": {
+                                      "op": "isNone",
+                                      "a": {
+                                        "op": "item",
+                                        "metric": "reps"
+                                      }
+                                    }
+                                  }
+                                },
+                                "b": {
+                                  "op": "num",
+                                  "v": 4.0
+                                }
+                              }
+                            },
+                            "b": {
+                              "op": "not",
+                              "a": {
+                                "op": "isNone",
+                                "a": {
+                                  "op": "at",
+                                  "sets": {
+                                    "slot": "squat",
+                                    "step": "last"
+                                  },
+                                  "i": 0,
+                                  "by": "position",
+                                  "metric": "reps"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "set": {}
+                  },
+                  {
+                    "k": "patch",
+                    "when": {
+                      "op": "bool",
+                      "v": true
+                    },
+                    "set": {
+                      "load": {
+                        "mode": "commit",
+                        "value": {
+                          "v": "q",
+                          "n": 107.0,
+                          "dim": {
+                            "mass": 1
+                          },
+                          "unit": "kg"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "next": {
+            "k": "workouts",
+            "outcomes": [
+              {
+                "slots": [
+                  3
+                ],
+                "node": 3
+              },
+              {
+                "slots": [
+                  2
+                ],
+                "node": 3
+              },
+              {
+                "slots": [
+                  1
+                ],
+                "node": 3
+              }
+            ]
+          }
+        },
+        {
+          "plan": {
+            "day": "B2",
+            "defaultDay": "B2",
+            "slots": [
+              {
+                "slot": "dead",
+                "exercise": {
+                  "id": "wger:105",
+                  "label": "Deadlift",
+                  "logging": "weight_reps"
+                },
+                "steps": [
+                  {
+                    "id": "work",
+                    "key": "work",
+                    "count": {
+                      "k": "n",
+                      "n": 4.0
+                    },
+                    "sets": [
+                      {
+                        "role": "working",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 130.0
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      },
+                      {
+                        "role": "working",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 130.0
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      },
+                      {
+                        "role": "working",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 130.0
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      },
+                      {
+                        "role": "working",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 130.0
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      }
+                    ],
+                    "block": null,
+                    "live": null
+                  },
+                  {
+                    "id": "last",
+                    "key": "last",
+                    "count": {
+                      "k": "n",
+                      "n": 1.0
+                    },
+                    "sets": [
+                      {
+                        "role": "amrap",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "atLeast",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 130.0
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      }
+                    ],
+                    "block": null,
+                    "live": null
+                  }
+                ],
+                "intensifier": null
+              }
+            ]
+          },
+          "targets": [],
+          "occurrences": [],
+          "finish": {
+            "k": "residual",
+            "refuseIf": {
+              "op": "not",
+              "a": {
+                "op": "or",
+                "a": {
+                  "op": "gt",
+                  "a": {
+                    "op": "agg",
+                    "fn": "count",
+                    "sets": {
+                      "slot": "dead",
+                      "step": "work"
+                    }
+                  },
+                  "b": {
+                    "op": "num",
+                    "v": 0.0
+                  }
+                },
+                "b": {
+                  "op": "gt",
+                  "a": {
+                    "op": "agg",
+                    "fn": "count",
+                    "sets": {
+                      "slot": "dead",
+                      "step": "last"
+                    }
+                  },
+                  "b": {
+                    "op": "num",
+                    "v": 0.0
+                  }
+                }
+              }
+            },
+            "slots": [
+              {
+                "slot": "dead",
+                "state": {
+                  "stage": {
+                    "v": "enum",
+                    "name": "gzT1",
+                    "tag": "5x3"
+                  },
+                  "load": {
+                    "v": "q",
+                    "n": 131.14285714285714,
+                    "dim": {
+                      "mass": 1
+                    },
+                    "unit": "kg"
+                  }
+                },
+                "branches": [
+                  {
+                    "k": "patch",
+                    "when": {
+                      "op": "not",
+                      "a": {
+                        "op": "or",
+                        "a": {
+                          "op": "gt",
+                          "a": {
+                            "op": "agg",
+                            "fn": "count",
+                            "sets": {
+                              "slot": "dead",
+                              "step": "work"
+                            }
+                          },
+                          "b": {
+                            "op": "num",
+                            "v": 0.0
+                          }
+                        },
+                        "b": {
+                          "op": "gt",
+                          "a": {
+                            "op": "agg",
+                            "fn": "count",
+                            "sets": {
+                              "slot": "dead",
+                              "step": "last"
+                            }
+                          },
+                          "b": {
+                            "op": "num",
+                            "v": 0.0
+                          }
+                        }
+                      }
+                    },
+                    "set": {}
+                  },
+                  {
+                    "k": "patch",
+                    "when": {
+                      "op": "or",
+                      "a": {
+                        "op": "or",
+                        "a": {
+                          "op": "agg",
+                          "fn": "any",
+                          "sets": {
+                            "slot": "dead",
+                            "step": "work"
+                          },
+                          "where": {
+                            "op": "and",
+                            "a": {
+                              "op": "not",
+                              "a": {
+                                "op": "isNone",
+                                "a": {
+                                  "op": "item",
+                                  "metric": "load"
+                                }
+                              }
+                            },
+                            "b": {
+                              "op": "not",
+                              "a": {
+                                "op": "ge",
+                                "a": {
+                                  "op": "item",
+                                  "metric": "load"
+                                },
+                                "b": {
+                                  "op": "num",
+                                  "v": 130.0
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "b": {
+                          "op": "and",
+                          "a": {
+                            "op": "not",
+                            "a": {
+                              "op": "isNone",
+                              "a": {
+                                "op": "at",
+                                "sets": {
+                                  "slot": "dead",
+                                  "step": "last"
+                                },
+                                "i": 0,
+                                "by": "position",
+                                "metric": "load"
+                              }
+                            }
+                          },
+                          "b": {
+                            "op": "not",
+                            "a": {
+                              "op": "ge",
+                              "a": {
+                                "op": "at",
+                                "sets": {
+                                  "slot": "dead",
+                                  "step": "last"
+                                },
+                                "i": 0,
+                                "by": "position",
+                                "metric": "load"
+                              },
+                              "b": {
+                                "op": "num",
+                                "v": 130.0
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "b": {
+                        "op": "and",
+                        "a": {
+                          "op": "not",
+                          "a": {
+                            "op": "ge",
+                            "a": {
+                              "op": "add",
+                              "a": {
+                                "op": "agg",
+                                "fn": "sum",
+                                "sets": {
+                                  "slot": "dead",
+                                  "step": "work"
+                                },
+                                "of": {
+                                  "op": "item",
+                                  "metric": "reps"
+                                }
+                              },
+                              "b": {
+                                "op": "if",
+                                "c": {
+                                  "op": "isNone",
+                                  "a": {
+                                    "op": "at",
+                                    "sets": {
+                                      "slot": "dead",
+                                      "step": "last"
+                                    },
+                                    "i": 0,
+                                    "by": "position",
+                                    "metric": "reps"
+                                  }
+                                },
+                                "a": {
+                                  "op": "num",
+                                  "v": 0.0
+                                },
+                                "b": {
+                                  "op": "at",
+                                  "sets": {
+                                    "slot": "dead",
+                                    "step": "last"
+                                  },
+                                  "i": 0,
+                                  "by": "position",
+                                  "metric": "reps"
+                                }
+                              }
+                            },
+                            "b": {
+                              "op": "num",
+                              "v": 15.0
+                            }
+                          }
+                        },
+                        "b": {
+                          "op": "and",
+                          "a": {
+                            "op": "not",
+                            "a": {
+                              "op": "lt",
+                              "a": {
+                                "op": "agg",
+                                "fn": "count",
+                                "sets": {
+                                  "slot": "dead",
+                                  "step": "work"
+                                },
+                                "where": {
+                                  "op": "not",
+                                  "a": {
+                                    "op": "isNone",
+                                    "a": {
+                                      "op": "item",
+                                      "metric": "reps"
+                                    }
+                                  }
+                                }
+                              },
+                              "b": {
+                                "op": "num",
+                                "v": 4.0
+                              }
+                            }
+                          },
+                          "b": {
+                            "op": "not",
+                            "a": {
+                              "op": "isNone",
+                              "a": {
+                                "op": "at",
+                                "sets": {
+                                  "slot": "dead",
+                                  "step": "last"
+                                },
+                                "i": 0,
+                                "by": "position",
+                                "metric": "reps"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "set": {
+                      "stage": {
+                        "mode": "commit",
+                        "value": {
+                          "v": "enum",
+                          "name": "gzT1",
+                          "tag": "6x2"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "k": "patch",
+                    "when": {
+                      "op": "or",
+                      "a": {
+                        "op": "or",
+                        "a": {
+                          "op": "lt",
+                          "a": {
+                            "op": "agg",
+                            "fn": "count",
+                            "sets": {
+                              "slot": "dead",
+                              "step": "work"
+                            },
+                            "where": {
+                              "op": "not",
+                              "a": {
+                                "op": "isNone",
+                                "a": {
+                                  "op": "item",
+                                  "metric": "load"
+                                }
+                              }
+                            }
+                          },
+                          "b": {
+                            "op": "num",
+                            "v": 4.0
+                          }
+                        },
+                        "b": {
+                          "op": "isNone",
+                          "a": {
+                            "op": "at",
+                            "sets": {
+                              "slot": "dead",
+                              "step": "last"
+                            },
+                            "i": 0,
+                            "by": "position",
+                            "metric": "load"
+                          }
+                        }
+                      },
+                      "b": {
+                        "op": "and",
+                        "a": {
+                          "op": "not",
+                          "a": {
+                            "op": "ge",
+                            "a": {
+                              "op": "add",
+                              "a": {
+                                "op": "agg",
+                                "fn": "sum",
+                                "sets": {
+                                  "slot": "dead",
+                                  "step": "work"
+                                },
+                                "of": {
+                                  "op": "item",
+                                  "metric": "reps"
+                                }
+                              },
+                              "b": {
+                                "op": "if",
+                                "c": {
+                                  "op": "isNone",
+                                  "a": {
+                                    "op": "at",
+                                    "sets": {
+                                      "slot": "dead",
+                                      "step": "last"
+                                    },
+                                    "i": 0,
+                                    "by": "position",
+                                    "metric": "reps"
+                                  }
+                                },
+                                "a": {
+                                  "op": "num",
+                                  "v": 0.0
+                                },
+                                "b": {
+                                  "op": "at",
+                                  "sets": {
+                                    "slot": "dead",
+                                    "step": "last"
+                                  },
+                                  "i": 0,
+                                  "by": "position",
+                                  "metric": "reps"
+                                }
+                              }
+                            },
+                            "b": {
+                              "op": "num",
+                              "v": 15.0
+                            }
+                          }
+                        },
+                        "b": {
+                          "op": "not",
+                          "a": {
+                            "op": "and",
+                            "a": {
+                              "op": "not",
+                              "a": {
+                                "op": "lt",
+                                "a": {
+                                  "op": "agg",
+                                  "fn": "count",
+                                  "sets": {
+                                    "slot": "dead",
+                                    "step": "work"
+                                  },
+                                  "where": {
+                                    "op": "not",
+                                    "a": {
+                                      "op": "isNone",
+                                      "a": {
+                                        "op": "item",
+                                        "metric": "reps"
+                                      }
+                                    }
+                                  }
+                                },
+                                "b": {
+                                  "op": "num",
+                                  "v": 4.0
+                                }
+                              }
+                            },
+                            "b": {
+                              "op": "not",
+                              "a": {
+                                "op": "isNone",
+                                "a": {
+                                  "op": "at",
+                                  "sets": {
+                                    "slot": "dead",
+                                    "step": "last"
+                                  },
+                                  "i": 0,
+                                  "by": "position",
+                                  "metric": "reps"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "set": {}
+                  },
+                  {
+                    "k": "patch",
+                    "when": {
+                      "op": "bool",
+                      "v": true
+                    },
+                    "set": {
+                      "load": {
+                        "mode": "commit",
+                        "value": {
+                          "v": "q",
+                          "n": 136.14285714285714,
+                          "dim": {
+                            "mass": 1
+                          },
+                          "unit": "kg"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "next": {
+            "k": "needsConnection",
+            "reason": "depth limit"
+          }
+        },
+        {
+          "plan": {
+            "day": "A2",
+            "defaultDay": "A2",
+            "slots": [
+              {
+                "slot": "bench",
+                "exercise": {
+                  "id": "wger:192",
+                  "label": "Barbell Bench Press",
+                  "logging": "weight_reps"
+                },
+                "steps": [
+                  {
+                    "id": "work",
+                    "key": "work",
+                    "count": {
+                      "k": "n",
+                      "n": 4.0
+                    },
+                    "sets": [
+                      {
+                        "role": "working",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 72.5
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      },
+                      {
+                        "role": "working",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 72.5
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      },
+                      {
+                        "role": "working",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 72.5
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      },
+                      {
+                        "role": "working",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 72.5
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      }
+                    ],
+                    "block": null,
+                    "live": null
+                  },
+                  {
+                    "id": "last",
+                    "key": "last",
+                    "count": {
+                      "k": "n",
+                      "n": 1.0
+                    },
+                    "sets": [
+                      {
+                        "role": "amrap",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "atLeast",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 72.5
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      }
+                    ],
+                    "block": null,
+                    "live": null
+                  }
+                ],
+                "intensifier": null
+              }
+            ]
+          },
+          "targets": [],
+          "occurrences": [],
+          "finish": {
+            "k": "residual",
+            "refuseIf": {
+              "op": "not",
+              "a": {
+                "op": "or",
+                "a": {
+                  "op": "gt",
+                  "a": {
+                    "op": "agg",
+                    "fn": "count",
+                    "sets": {
+                      "slot": "bench",
+                      "step": "work"
+                    }
+                  },
+                  "b": {
+                    "op": "num",
+                    "v": 0.0
+                  }
+                },
+                "b": {
+                  "op": "gt",
+                  "a": {
+                    "op": "agg",
+                    "fn": "count",
+                    "sets": {
+                      "slot": "bench",
+                      "step": "last"
+                    }
+                  },
+                  "b": {
+                    "op": "num",
+                    "v": 0.0
+                  }
+                }
+              }
+            },
+            "slots": [
+              {
+                "slot": "bench",
+                "state": {
+                  "stage": {
+                    "v": "enum",
+                    "name": "gzT1",
+                    "tag": "5x3"
+                  },
+                  "load": {
+                    "v": "q",
+                    "n": 72.85714285714285,
+                    "dim": {
+                      "mass": 1
+                    },
+                    "unit": "kg"
+                  }
+                },
+                "branches": [
+                  {
+                    "k": "patch",
+                    "when": {
+                      "op": "not",
+                      "a": {
+                        "op": "or",
+                        "a": {
+                          "op": "gt",
+                          "a": {
+                            "op": "agg",
+                            "fn": "count",
+                            "sets": {
+                              "slot": "bench",
+                              "step": "work"
+                            }
+                          },
+                          "b": {
+                            "op": "num",
+                            "v": 0.0
+                          }
+                        },
+                        "b": {
+                          "op": "gt",
+                          "a": {
+                            "op": "agg",
+                            "fn": "count",
+                            "sets": {
+                              "slot": "bench",
+                              "step": "last"
+                            }
+                          },
+                          "b": {
+                            "op": "num",
+                            "v": 0.0
+                          }
+                        }
+                      }
+                    },
+                    "set": {}
+                  },
+                  {
+                    "k": "patch",
+                    "when": {
+                      "op": "or",
+                      "a": {
+                        "op": "or",
+                        "a": {
+                          "op": "agg",
+                          "fn": "any",
+                          "sets": {
+                            "slot": "bench",
+                            "step": "work"
+                          },
+                          "where": {
+                            "op": "and",
+                            "a": {
+                              "op": "not",
+                              "a": {
+                                "op": "isNone",
+                                "a": {
+                                  "op": "item",
+                                  "metric": "load"
+                                }
+                              }
+                            },
+                            "b": {
+                              "op": "not",
+                              "a": {
+                                "op": "ge",
+                                "a": {
+                                  "op": "item",
+                                  "metric": "load"
+                                },
+                                "b": {
+                                  "op": "num",
+                                  "v": 72.5
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "b": {
+                          "op": "and",
+                          "a": {
+                            "op": "not",
+                            "a": {
+                              "op": "isNone",
+                              "a": {
+                                "op": "at",
+                                "sets": {
+                                  "slot": "bench",
+                                  "step": "last"
+                                },
+                                "i": 0,
+                                "by": "position",
+                                "metric": "load"
+                              }
+                            }
+                          },
+                          "b": {
+                            "op": "not",
+                            "a": {
+                              "op": "ge",
+                              "a": {
+                                "op": "at",
+                                "sets": {
+                                  "slot": "bench",
+                                  "step": "last"
+                                },
+                                "i": 0,
+                                "by": "position",
+                                "metric": "load"
+                              },
+                              "b": {
+                                "op": "num",
+                                "v": 72.5
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "b": {
+                        "op": "and",
+                        "a": {
+                          "op": "not",
+                          "a": {
+                            "op": "ge",
+                            "a": {
+                              "op": "add",
+                              "a": {
+                                "op": "agg",
+                                "fn": "sum",
+                                "sets": {
+                                  "slot": "bench",
+                                  "step": "work"
+                                },
+                                "of": {
+                                  "op": "item",
+                                  "metric": "reps"
+                                }
+                              },
+                              "b": {
+                                "op": "if",
+                                "c": {
+                                  "op": "isNone",
+                                  "a": {
+                                    "op": "at",
+                                    "sets": {
+                                      "slot": "bench",
+                                      "step": "last"
+                                    },
+                                    "i": 0,
+                                    "by": "position",
+                                    "metric": "reps"
+                                  }
+                                },
+                                "a": {
+                                  "op": "num",
+                                  "v": 0.0
+                                },
+                                "b": {
+                                  "op": "at",
+                                  "sets": {
+                                    "slot": "bench",
+                                    "step": "last"
+                                  },
+                                  "i": 0,
+                                  "by": "position",
+                                  "metric": "reps"
+                                }
+                              }
+                            },
+                            "b": {
+                              "op": "num",
+                              "v": 15.0
+                            }
+                          }
+                        },
+                        "b": {
+                          "op": "and",
+                          "a": {
+                            "op": "not",
+                            "a": {
+                              "op": "lt",
+                              "a": {
+                                "op": "agg",
+                                "fn": "count",
+                                "sets": {
+                                  "slot": "bench",
+                                  "step": "work"
+                                },
+                                "where": {
+                                  "op": "not",
+                                  "a": {
+                                    "op": "isNone",
+                                    "a": {
+                                      "op": "item",
+                                      "metric": "reps"
+                                    }
+                                  }
+                                }
+                              },
+                              "b": {
+                                "op": "num",
+                                "v": 4.0
+                              }
+                            }
+                          },
+                          "b": {
+                            "op": "not",
+                            "a": {
+                              "op": "isNone",
+                              "a": {
+                                "op": "at",
+                                "sets": {
+                                  "slot": "bench",
+                                  "step": "last"
+                                },
+                                "i": 0,
+                                "by": "position",
+                                "metric": "reps"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "set": {
+                      "stage": {
+                        "mode": "commit",
+                        "value": {
+                          "v": "enum",
+                          "name": "gzT1",
+                          "tag": "6x2"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "k": "patch",
+                    "when": {
+                      "op": "or",
+                      "a": {
+                        "op": "or",
+                        "a": {
+                          "op": "lt",
+                          "a": {
+                            "op": "agg",
+                            "fn": "count",
+                            "sets": {
+                              "slot": "bench",
+                              "step": "work"
+                            },
+                            "where": {
+                              "op": "not",
+                              "a": {
+                                "op": "isNone",
+                                "a": {
+                                  "op": "item",
+                                  "metric": "load"
+                                }
+                              }
+                            }
+                          },
+                          "b": {
+                            "op": "num",
+                            "v": 4.0
+                          }
+                        },
+                        "b": {
+                          "op": "isNone",
+                          "a": {
+                            "op": "at",
+                            "sets": {
+                              "slot": "bench",
+                              "step": "last"
+                            },
+                            "i": 0,
+                            "by": "position",
+                            "metric": "load"
+                          }
+                        }
+                      },
+                      "b": {
+                        "op": "and",
+                        "a": {
+                          "op": "not",
+                          "a": {
+                            "op": "ge",
+                            "a": {
+                              "op": "add",
+                              "a": {
+                                "op": "agg",
+                                "fn": "sum",
+                                "sets": {
+                                  "slot": "bench",
+                                  "step": "work"
+                                },
+                                "of": {
+                                  "op": "item",
+                                  "metric": "reps"
+                                }
+                              },
+                              "b": {
+                                "op": "if",
+                                "c": {
+                                  "op": "isNone",
+                                  "a": {
+                                    "op": "at",
+                                    "sets": {
+                                      "slot": "bench",
+                                      "step": "last"
+                                    },
+                                    "i": 0,
+                                    "by": "position",
+                                    "metric": "reps"
+                                  }
+                                },
+                                "a": {
+                                  "op": "num",
+                                  "v": 0.0
+                                },
+                                "b": {
+                                  "op": "at",
+                                  "sets": {
+                                    "slot": "bench",
+                                    "step": "last"
+                                  },
+                                  "i": 0,
+                                  "by": "position",
+                                  "metric": "reps"
+                                }
+                              }
+                            },
+                            "b": {
+                              "op": "num",
+                              "v": 15.0
+                            }
+                          }
+                        },
+                        "b": {
+                          "op": "not",
+                          "a": {
+                            "op": "and",
+                            "a": {
+                              "op": "not",
+                              "a": {
+                                "op": "lt",
+                                "a": {
+                                  "op": "agg",
+                                  "fn": "count",
+                                  "sets": {
+                                    "slot": "bench",
+                                    "step": "work"
+                                  },
+                                  "where": {
+                                    "op": "not",
+                                    "a": {
+                                      "op": "isNone",
+                                      "a": {
+                                        "op": "item",
+                                        "metric": "reps"
+                                      }
+                                    }
+                                  }
+                                },
+                                "b": {
+                                  "op": "num",
+                                  "v": 4.0
+                                }
+                              }
+                            },
+                            "b": {
+                              "op": "not",
+                              "a": {
+                                "op": "isNone",
+                                "a": {
+                                  "op": "at",
+                                  "sets": {
+                                    "slot": "bench",
+                                    "step": "last"
+                                  },
+                                  "i": 0,
+                                  "by": "position",
+                                  "metric": "reps"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "set": {}
+                  },
+                  {
+                    "k": "patch",
+                    "when": {
+                      "op": "bool",
+                      "v": true
+                    },
+                    "set": {
+                      "load": {
+                        "mode": "commit",
+                        "value": {
+                          "v": "q",
+                          "n": 75.35714285714285,
+                          "dim": {
+                            "mass": 1
+                          },
+                          "unit": "kg"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "next": {
+            "k": "workouts",
+            "outcomes": [
+              {
+                "slots": [
+                  3
+                ],
+                "node": 1
+              },
+              {
+                "slots": [
+                  2
+                ],
+                "node": 1
+              },
+              {
+                "slots": [
+                  1
+                ],
+                "node": 1
+              }
+            ]
+          }
+        },
+        {
+          "plan": {
+            "day": "B1",
+            "defaultDay": "B1",
+            "slots": [
+              {
+                "slot": "press",
+                "exercise": {
+                  "id": "wger:119",
+                  "label": "Overhead Press",
+                  "logging": "weight_reps"
+                },
+                "steps": [
+                  {
+                    "id": "work",
+                    "key": "work",
+                    "count": {
+                      "k": "n",
+                      "n": 4.0
+                    },
+                    "sets": [
+                      {
+                        "role": "working",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 42.5
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      },
+                      {
+                        "role": "working",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 42.5
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      },
+                      {
+                        "role": "working",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 42.5
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      },
+                      {
+                        "role": "working",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 42.5
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      }
+                    ],
+                    "block": null,
+                    "live": null
+                  },
+                  {
+                    "id": "last",
+                    "key": "last",
+                    "count": {
+                      "k": "n",
+                      "n": 1.0
+                    },
+                    "sets": [
+                      {
+                        "role": "amrap",
+                        "metrics": {
+                          "reps": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "atLeast",
+                              "v": 3.0
+                            }
+                          },
+                          "load": {
+                            "k": "fixed",
+                            "v": {
+                              "b": "exact",
+                              "v": 42.5
+                            }
+                          }
+                        },
+                        "restSec": null,
+                        "tempo": null,
+                        "cluster": null
+                      }
+                    ],
+                    "block": null,
+                    "live": null
+                  }
+                ],
+                "intensifier": null
+              }
+            ]
+          },
+          "targets": [],
+          "occurrences": [],
+          "finish": {
+            "k": "residual",
+            "refuseIf": {
+              "op": "not",
+              "a": {
+                "op": "or",
+                "a": {
+                  "op": "gt",
+                  "a": {
+                    "op": "agg",
+                    "fn": "count",
+                    "sets": {
+                      "slot": "press",
+                      "step": "work"
+                    }
+                  },
+                  "b": {
+                    "op": "num",
+                    "v": 0.0
+                  }
+                },
+                "b": {
+                  "op": "gt",
+                  "a": {
+                    "op": "agg",
+                    "fn": "count",
+                    "sets": {
+                      "slot": "press",
+                      "step": "last"
+                    }
+                  },
+                  "b": {
+                    "op": "num",
+                    "v": 0.0
+                  }
+                }
+              }
+            },
+            "slots": [
+              {
+                "slot": "press",
+                "state": {
+                  "stage": {
+                    "v": "enum",
+                    "name": "gzT1",
+                    "tag": "5x3"
+                  },
+                  "load": {
+                    "v": "q",
+                    "n": 43.71428571428571,
+                    "dim": {
+                      "mass": 1
+                    },
+                    "unit": "kg"
+                  }
+                },
+                "branches": [
+                  {
+                    "k": "patch",
+                    "when": {
+                      "op": "not",
+                      "a": {
+                        "op": "or",
+                        "a": {
+                          "op": "gt",
+                          "a": {
+                            "op": "agg",
+                            "fn": "count",
+                            "sets": {
+                              "slot": "press",
+                              "step": "work"
+                            }
+                          },
+                          "b": {
+                            "op": "num",
+                            "v": 0.0
+                          }
+                        },
+                        "b": {
+                          "op": "gt",
+                          "a": {
+                            "op": "agg",
+                            "fn": "count",
+                            "sets": {
+                              "slot": "press",
+                              "step": "last"
+                            }
+                          },
+                          "b": {
+                            "op": "num",
+                            "v": 0.0
+                          }
+                        }
+                      }
+                    },
+                    "set": {}
+                  },
+                  {
+                    "k": "patch",
+                    "when": {
+                      "op": "or",
+                      "a": {
+                        "op": "or",
+                        "a": {
+                          "op": "agg",
+                          "fn": "any",
+                          "sets": {
+                            "slot": "press",
+                            "step": "work"
+                          },
+                          "where": {
+                            "op": "and",
+                            "a": {
+                              "op": "not",
+                              "a": {
+                                "op": "isNone",
+                                "a": {
+                                  "op": "item",
+                                  "metric": "load"
+                                }
+                              }
+                            },
+                            "b": {
+                              "op": "not",
+                              "a": {
+                                "op": "ge",
+                                "a": {
+                                  "op": "item",
+                                  "metric": "load"
+                                },
+                                "b": {
+                                  "op": "num",
+                                  "v": 42.5
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "b": {
+                          "op": "and",
+                          "a": {
+                            "op": "not",
+                            "a": {
+                              "op": "isNone",
+                              "a": {
+                                "op": "at",
+                                "sets": {
+                                  "slot": "press",
+                                  "step": "last"
+                                },
+                                "i": 0,
+                                "by": "position",
+                                "metric": "load"
+                              }
+                            }
+                          },
+                          "b": {
+                            "op": "not",
+                            "a": {
+                              "op": "ge",
+                              "a": {
+                                "op": "at",
+                                "sets": {
+                                  "slot": "press",
+                                  "step": "last"
+                                },
+                                "i": 0,
+                                "by": "position",
+                                "metric": "load"
+                              },
+                              "b": {
+                                "op": "num",
+                                "v": 42.5
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "b": {
+                        "op": "and",
+                        "a": {
+                          "op": "not",
+                          "a": {
+                            "op": "ge",
+                            "a": {
+                              "op": "add",
+                              "a": {
+                                "op": "agg",
+                                "fn": "sum",
+                                "sets": {
+                                  "slot": "press",
+                                  "step": "work"
+                                },
+                                "of": {
+                                  "op": "item",
+                                  "metric": "reps"
+                                }
+                              },
+                              "b": {
+                                "op": "if",
+                                "c": {
+                                  "op": "isNone",
+                                  "a": {
+                                    "op": "at",
+                                    "sets": {
+                                      "slot": "press",
+                                      "step": "last"
+                                    },
+                                    "i": 0,
+                                    "by": "position",
+                                    "metric": "reps"
+                                  }
+                                },
+                                "a": {
+                                  "op": "num",
+                                  "v": 0.0
+                                },
+                                "b": {
+                                  "op": "at",
+                                  "sets": {
+                                    "slot": "press",
+                                    "step": "last"
+                                  },
+                                  "i": 0,
+                                  "by": "position",
+                                  "metric": "reps"
+                                }
+                              }
+                            },
+                            "b": {
+                              "op": "num",
+                              "v": 15.0
+                            }
+                          }
+                        },
+                        "b": {
+                          "op": "and",
+                          "a": {
+                            "op": "not",
+                            "a": {
+                              "op": "lt",
+                              "a": {
+                                "op": "agg",
+                                "fn": "count",
+                                "sets": {
+                                  "slot": "press",
+                                  "step": "work"
+                                },
+                                "where": {
+                                  "op": "not",
+                                  "a": {
+                                    "op": "isNone",
+                                    "a": {
+                                      "op": "item",
+                                      "metric": "reps"
+                                    }
+                                  }
+                                }
+                              },
+                              "b": {
+                                "op": "num",
+                                "v": 4.0
+                              }
+                            }
+                          },
+                          "b": {
+                            "op": "not",
+                            "a": {
+                              "op": "isNone",
+                              "a": {
+                                "op": "at",
+                                "sets": {
+                                  "slot": "press",
+                                  "step": "last"
+                                },
+                                "i": 0,
+                                "by": "position",
+                                "metric": "reps"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "set": {
+                      "stage": {
+                        "mode": "commit",
+                        "value": {
+                          "v": "enum",
+                          "name": "gzT1",
+                          "tag": "6x2"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "k": "patch",
+                    "when": {
+                      "op": "or",
+                      "a": {
+                        "op": "or",
+                        "a": {
+                          "op": "lt",
+                          "a": {
+                            "op": "agg",
+                            "fn": "count",
+                            "sets": {
+                              "slot": "press",
+                              "step": "work"
+                            },
+                            "where": {
+                              "op": "not",
+                              "a": {
+                                "op": "isNone",
+                                "a": {
+                                  "op": "item",
+                                  "metric": "load"
+                                }
+                              }
+                            }
+                          },
+                          "b": {
+                            "op": "num",
+                            "v": 4.0
+                          }
+                        },
+                        "b": {
+                          "op": "isNone",
+                          "a": {
+                            "op": "at",
+                            "sets": {
+                              "slot": "press",
+                              "step": "last"
+                            },
+                            "i": 0,
+                            "by": "position",
+                            "metric": "load"
+                          }
+                        }
+                      },
+                      "b": {
+                        "op": "and",
+                        "a": {
+                          "op": "not",
+                          "a": {
+                            "op": "ge",
+                            "a": {
+                              "op": "add",
+                              "a": {
+                                "op": "agg",
+                                "fn": "sum",
+                                "sets": {
+                                  "slot": "press",
+                                  "step": "work"
+                                },
+                                "of": {
+                                  "op": "item",
+                                  "metric": "reps"
+                                }
+                              },
+                              "b": {
+                                "op": "if",
+                                "c": {
+                                  "op": "isNone",
+                                  "a": {
+                                    "op": "at",
+                                    "sets": {
+                                      "slot": "press",
+                                      "step": "last"
+                                    },
+                                    "i": 0,
+                                    "by": "position",
+                                    "metric": "reps"
+                                  }
+                                },
+                                "a": {
+                                  "op": "num",
+                                  "v": 0.0
+                                },
+                                "b": {
+                                  "op": "at",
+                                  "sets": {
+                                    "slot": "press",
+                                    "step": "last"
+                                  },
+                                  "i": 0,
+                                  "by": "position",
+                                  "metric": "reps"
+                                }
+                              }
+                            },
+                            "b": {
+                              "op": "num",
+                              "v": 15.0
+                            }
+                          }
+                        },
+                        "b": {
+                          "op": "not",
+                          "a": {
+                            "op": "and",
+                            "a": {
+                              "op": "not",
+                              "a": {
+                                "op": "lt",
+                                "a": {
+                                  "op": "agg",
+                                  "fn": "count",
+                                  "sets": {
+                                    "slot": "press",
+                                    "step": "work"
+                                  },
+                                  "where": {
+                                    "op": "not",
+                                    "a": {
+                                      "op": "isNone",
+                                      "a": {
+                                        "op": "item",
+                                        "metric": "reps"
+                                      }
+                                    }
+                                  }
+                                },
+                                "b": {
+                                  "op": "num",
+                                  "v": 4.0
+                                }
+                              }
+                            },
+                            "b": {
+                              "op": "not",
+                              "a": {
+                                "op": "isNone",
+                                "a": {
+                                  "op": "at",
+                                  "sets": {
+                                    "slot": "press",
+                                    "step": "last"
+                                  },
+                                  "i": 0,
+                                  "by": "position",
+                                  "metric": "reps"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "set": {}
+                  },
+                  {
+                    "k": "patch",
+                    "when": {
+                      "op": "bool",
+                      "v": true
+                    },
+                    "set": {
+                      "load": {
+                        "mode": "commit",
+                        "value": {
+                          "v": "q",
+                          "n": 46.21428571428571,
+                          "dim": {
+                            "mass": 1
+                          },
+                          "unit": "kg"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "next": {
+            "k": "workouts",
+            "outcomes": [
+              {
+                "slots": [
+                  3
+                ],
+                "node": 2
+              },
+              {
+                "slots": [
+                  2
+                ],
+                "node": 2
+              },
+              {
+                "slots": [
+                  1
+                ],
+                "node": 2
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "events": [
+    {
+      "id": "offline-event",
+      "kind": "setLogged",
+      "slot": "squat",
+      "step": "work",
+      "set": 0,
+      "values": {
+        "load": 100,
+        "reps": 5
+      }
+    }
+  ],
+  "finish": {
+    "k": "finished",
+    "slots": [
+      {
+        "slot": "squat",
+        "branch": 1,
+        "state": {
+          "stage": {
+            "v": "enum",
+            "name": "gzT1",
+            "tag": "6x2"
+          },
+          "load": {
+            "v": "q",
+            "n": 102.0,
+            "dim": {
+              "mass": 1
+            },
+            "unit": "kg"
+          }
+        },
+        "proposed": {}
+      }
+    ]
+  },
+  "offlineState": {
+    "squat": {
+      "stage": {
+        "v": "enum",
+        "name": "gzT1",
+        "tag": "6x2"
+      },
+      "load": {
+        "v": "q",
+        "n": 102.0,
+        "dim": {
+          "mass": 1
+        },
+        "unit": "kg"
+      }
+    }
+  }
+}

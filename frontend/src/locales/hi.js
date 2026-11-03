@@ -2631,4 +2631,11 @@ export default {
   'Another device saved this set first. Yours was: {0}': 'किसी दूसरे डिवाइस ने यह सेट पहले सेव किया। आपका था: {0}',
   'Save mine': 'मेरा सेव करें',
   'cleared': 'हटाया गया',
+  "Connect to finish this workout. Your entries are saved on this device.": "यह वर्कआउट पूरा करने के लिए कनेक्ट करें। आपकी प्रविष्टियाँ इस डिवाइस पर सहेजी गई हैं।",
+  "Download saved offline entries": "सहेजी गई ऑफ़लाइन प्रविष्टियाँ डाउनलोड करें",
+  "It will enter your history after Reppen verifies it on sync.": "सिंक करते समय Reppen की पुष्टि के बाद यह आपके इतिहास में दिखेगा।",
+  "Saved on this device. Waiting to sync.": "इस डिवाइस पर सहेजा गया। सिंक होने की प्रतीक्षा में।",
+  "The server result differs. Your offline entries are kept on this device.": "सर्वर का परिणाम अलग है। आपकी ऑफ़लाइन प्रविष्टियाँ इस डिवाइस पर सुरक्षित हैं।",
+  "The server result differs. Your offline entries are kept on this device; reconnect to reconcile them.": "सर्वर का परिणाम अलग है। आपकी ऑफ़लाइन प्रविष्टियाँ इस डिवाइस पर सुरक्षित हैं; उनका मिलान करने के लिए दोबारा कनेक्ट करें।",
+  "Use server workout and keep a recovery copy": "सर्वर का वर्कआउट इस्तेमाल करें और रिकवरी कॉपी रखें",
 }

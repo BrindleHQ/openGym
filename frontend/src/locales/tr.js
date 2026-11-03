@@ -2631,4 +2631,11 @@ export default {
   'Another device saved this set first. Yours was: {0}': 'Başka bir cihaz bu seti önce kaydetti. Seninki: {0}',
   'Save mine': 'Benimkini kaydet',
   'cleared': 'temizlendi',
+  "Connect to finish this workout. Your entries are saved on this device.": "Bu antrenmanı bitirmek için bağlan. Kayıtların bu cihazda saklanıyor.",
+  "Download saved offline entries": "Kaydedilen çevrimdışı kayıtları indir",
+  "It will enter your history after Reppen verifies it on sync.": "Reppen eşitleme sırasında doğruladıktan sonra geçmişinde görünecek.",
+  "Saved on this device. Waiting to sync.": "Bu cihazda kaydedildi. Eşitleme bekleniyor.",
+  "The server result differs. Your offline entries are kept on this device.": "Sunucu sonucu farklı. Çevrimdışı kayıtların bu cihazda tutuluyor.",
+  "The server result differs. Your offline entries are kept on this device; reconnect to reconcile them.": "Sunucu sonucu farklı. Çevrimdışı kayıtların bu cihazda tutuluyor; uzlaştırmak için yeniden bağlan.",
+  "Use server workout and keep a recovery copy": "Sunucudaki antrenmanı kullan ve bir kurtarma kopyası sakla",
 }
