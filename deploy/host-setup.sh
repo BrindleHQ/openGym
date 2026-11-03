@@ -29,6 +29,7 @@ install -m 755 -o root -g root deploy/opengym-release.sh /usr/local/bin/opengym-
 install -d -m 755 -o root -g root /usr/local/lib/opengym/deploy /usr/local/lib/opengym/scripts/deploy
 install -m 644 -o root -g root deploy/coolify-compose.yml deploy/environments.json /usr/local/lib/opengym/deploy/
 install -m 644 -o root -g root scripts/deploy/coolify.mjs /usr/local/lib/opengym/scripts/deploy/
+install -m 644 -o root -g root deploy/reppen-backup.sh /usr/local/lib/opengym/deploy/
 docker pull -q "$(sed -n 's/^NODE_IMAGE=//p' deploy/opengym-release.sh)" >/dev/null
 [ -s /etc/opengym/coolify-token ] || echo "warning: /etc/opengym/coolify-token is missing; opengym-release needs it" >&2
 
@@ -44,6 +45,11 @@ for env in "$@"; do
   install -d -m 755 -o root -g root "/srv/opengym/$env"
   install -d -m 700 -o 10001 -g 10001 "/srv/opengym/$env/data"
   install -d -m 700 -o root -g root "/srv/opengym/$env/backups"
+  install -d -m 700 -o root -g root "/etc/opengym/reppen-$env" "/srv/opengym/$env/reppen" "/srv/opengym/$env/reppen/backups"
+  # PostgreSQL's entrypoint owns/chowns its child directory; never reset an existing PGDATA.
+  if [ ! -d "/srv/opengym/$env/reppen/postgres" ]; then
+    install -d -m 700 -o root -g root "/srv/opengym/$env/reppen/postgres"
+  fi
   [ -s "/srv/opengym/$env/service-uuid" ] || echo "warning: /srv/opengym/$env/service-uuid is missing" >&2
   port=$(jq -er ".$env.tailnet.port" "$envs")
   local_port=$(jq -er ".$env.localPort" "$envs")

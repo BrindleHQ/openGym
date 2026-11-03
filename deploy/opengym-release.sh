@@ -133,15 +133,22 @@ coolify_idle() {
 
 # Until api and web are healthy and the port serves `sha` with the plan's settings.
 wait_live() {
-  local plan=$1 sha=$2 timeout=$3 port want deadline state c health live
+  local plan=$1 sha=$2 timeout=$3 port want deadline state c health live services
+  services="api web"
+  if jq -e '.reppen == true' "$plan" >/dev/null; then
+    services="$services reppen-db reppen reppen-backup"
+  fi
   port=$(jq -r .local_port "$plan"); want=$(jq -c .expect "$plan")
   deadline=$(( $(date +%s) + timeout ))
   while :; do
     state=ok
-    for c in api web; do
+    for c in $services; do
       health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$c-$uuid" 2>/dev/null) || health=missing
       [ "$health" = healthy ] || { state="$c $health"; break; }
     done
+    if [ "$state" = ok ] && jq -e '.reppen == true' "$plan" >/dev/null; then
+      [ "$(docker inspect -f '{{.State.Running}}' "reppen-worker-$uuid" 2>/dev/null)" = true ] || state="reppen-worker not running"
+    fi
     if [ "$state" = ok ]; then
       live=$(probe "$port")
       jq -e --arg sha "$sha" --argjson want "$want" \
@@ -216,6 +223,13 @@ head -c 10000 | jq -ce '
 docker run --rm -i --network none --read-only -v "$LIB:/opt/opengym:ro" "$NODE_IMAGE" \
   node /opt/opengym/scripts/deploy/coolify.mjs plan "$env" /dev/stdin ${bootstrap:+"$bootstrap"} < "$release" > "$plan" 2>/dev/null \
   || die "could not render $env from $LIB (deploy/host-setup.sh installs it)"
+if jq -e '.reppen == true' "$plan" >/dev/null; then
+  for file in postgres runtime backup; do
+    secret="/etc/opengym/reppen-$env/$file.env"
+    [ -s "$secret" ] && [ "$(stat -c '%u:%g:%a' "$secret")" = 0:0:600 ] \
+      || die "Reppen requires root:root mode 600 $secret"
+  done
+fi
 sha=$(jq -r .release.sha "$plan")
 cur=$(current_id)
 same() { cmp -s <(jq -S '{env, docker_compose_raw, urls, service_env, local_port, expect}' "$1") \
