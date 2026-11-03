@@ -449,7 +449,7 @@ jobs:
           for env in staging production; do
             node scripts/deploy/coolify.mjs render "$env" dummy-release.json > "compose-$env.yml"
             # Validate without provisioning/reading production env files on a CI runner.
-            sed -E 's|env_file: /etc/opengym/reppen-(staging|production)/(postgres|runtime|backup)\.env|env_file: /dev/null|' "compose-$env.yml" \
+            sed -E 's#env_file: /etc/opengym/reppen-(staging|production)/(postgres|runtime|backup)\.env#env_file: /dev/null#' "compose-$env.yml" \
               | docker compose -p opengym-config-test -f - config -q
             echo "$env: ok"
           done
