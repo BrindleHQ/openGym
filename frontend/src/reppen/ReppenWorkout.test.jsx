@@ -88,13 +88,12 @@ describe('Reppen workout screens', () => {
   })
   it('guides practice in profile units, blocks working sets until confirmed, and keeps queued setup visible', async () => {
     await reppenStore.getState().start('A1')
-    const pack = vi.spyOn(reppenStore.getState(), 'loadOfflinePack').mockResolvedValue(null)
     useStore.setState(s => ({ S: { ...s.S, unit: 'lb' } }))
     const changeSetup = async (patch, trial = null) => act(async () => reppenStore.setState(s => {
       const plan = structuredClone(s.workout.effectivePlan || s.workout.plan)
       plan.slots[0].setup = { loadRequired: true, workingLoadKg: null, incrementKg: null, progressionPending: false, trials: [], ...plan.slots[0].setup, ...patch }
       for (const set of plan.slots[0].steps[0].sets) set.metrics.load = { k: 'unknown', reason: 'startingLoadRequired' }
-      return { workout: { ...s.workout, effectivePlan: plan }, offlinePack: null, ...(trial ? { outbox: [trial] } : {}) }
+      return { workout: { ...s.workout, effectivePlan: plan }, ...(trial ? { outbox: [trial] } : {}) }
     }))
     await changeSetup({})
     const host = await render(ReppenWorkout)
@@ -123,7 +122,6 @@ describe('Reppen workout screens', () => {
     expect(host.textContent).toContain('Setup saved on this device.')
     expect(first.querySelector('[role=checkbox]').disabled).toBe(true)
     expect(button(host, 'Use 20 lb as my starting weight').disabled).toBe(true)
-    pack.mockRestore()
   })
   it('offers the next available weight only for an earned increase and never after working sets begin', async () => {
     await reppenStore.getState().start('A1')

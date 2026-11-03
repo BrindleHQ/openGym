@@ -59,6 +59,60 @@ function world() {
 }
 
 describe('durable offline workout chain', () => {
+  it.each([
+    ['logLoadTrial', ['s', 20, 8, 'manageable'], { loadRequired: true, workingLoadKg: null, incrementKg: null, progressionPending: false, trials: [{ loadKg: 20, reps: 8, feedback: 'manageable' }], confirmedThisWorkout: false }],
+    ['confirmStartingLoad', ['s', 20, 'known'], { loadRequired: false, workingLoadKg: 20, incrementKg: null, progressionPending: false, trials: [], confirmedThisWorkout: true }],
+    ['confirmEquipment', ['s', 25, 5], { loadRequired: false, workingLoadKg: 25, incrementKg: 5, progressionPending: false, trials: [], confirmedThisWorkout: false }],
+  ])('preserves the authoritative %s result despite an older guided offline pack, including offline reload', async (method, args, expectedSetup) => {
+    const w = world(); let s = w.device()
+    await s.getState().start('A')
+    const id = s.getState().workout.workoutId, server = w.records.get(id)
+    server.plan.slots[0].setup = { loadRequired: method !== 'confirmEquipment', workingLoadKg: method === 'confirmEquipment' ? 20 : null,
+      incrementKg: null, progressionPending: method === 'confirmEquipment', trials: [], confirmedThisWorkout: false }
+    server.plan.slots[0].steps[0].sets[0].metrics.load = method === 'confirmEquipment'
+      ? { k: 'fixed', v: { b: 'exact', v: 20 } } : { k: 'unknown', reason: 'startingLoadRequired' }
+    server.effectivePlan = copy(server.plan)
+    await s.getState().resume()
+    const stalePlan = copy(server.effectivePlan)
+    w.client.offlinePack.mockResolvedValue({ workoutId: id, enrollmentId: 'e', artifactId: 'a', workoutRevision: 0, enrollmentRevision: 0,
+      pack: { format: 'reppen.residual/1', nodes: [{ plan: stalePlan, targets: [], occurrences: [], finish: { k: 'needsConnection', reason: 'timed coaching' } }] } })
+    await s.getState().loadOfflinePack()
+    const original = w.client.appendEvents.getMockImplementation()
+    const expectedPlan = copy(stalePlan)
+    expectedPlan.slots[0].setup = expectedSetup
+    if (expectedSetup.workingLoadKg != null) expectedPlan.slots[0].steps[0].sets[0].metrics.load = { k: 'fixed', v: { b: 'exact', v: expectedSetup.workingLoadKg } }
+    w.client.appendEvents.mockImplementation(async (...values) => {
+      await original(...values)
+      server.effectivePlan = copy(expectedPlan)
+      server.pendingQuestions = [{ id: 'server-question', occurrence: 'server-occurrence', text: 'Server question', choices: [] }]
+      return copy(server)
+    })
+    w.net.down = true
+    await s.getState()[method](...args)
+    const queued = copy(s.getState().outbox)
+    expect(queued).toHaveLength(1)
+    s.getState()._disposeOffline(); s = w.device()
+    expect(s.getState().outbox).toEqual(queued)
+    w.net.down = false
+    expect(await s.getState().flush()).toBe(true)
+    expect(s.getState().workout.effectivePlan).toEqual(expectedPlan)
+    expect(s.getState().workout.pendingQuestions).toEqual(server.pendingQuestions)
+    expect(s.getState().previewOfflineFinish().finish.k).toBe('needsConnection')
+    s.getState()._disposeOffline(); s = w.device()
+    expect(s.getState().workout.effectivePlan).toEqual(expectedPlan)
+    await s.getState().catchUp()
+    expect(s.getState().workout.effectivePlan).toEqual(expectedPlan)
+    expect(s.getState().workout.events).toEqual(queued)
+    if (!expectedSetup.loadRequired) {
+      w.net.down = true
+      await s.getState().logSet('s', 'work', 0, { load: expectedSetup.workingLoadKg, reps: 8 })
+      expect(s.getState().outbox[0]).toMatchObject({ kind: 'setLogged', values: { load: expectedSetup.workingLoadKg, reps: 8 } })
+      expect(s.getState().workout.effectivePlan).toEqual(expectedPlan)
+      w.net.down = false
+      expect(await s.getState().flush()).toBe(true)
+      expect(s.getState().workout.events.at(-1).kind).toBe('setLogged')
+    }
+  })
   it('retains and replays logs when coaching refuses an offline pack and finish', async () => {
     const w = world(); let s = w.device()
     w.client.offlinePack.mockRejectedValue(new ReppenError(409, { error: 'needsConnection' }))

@@ -30,6 +30,13 @@ export function offlineProjection(s) {
     || (nodeIndex === 0 && (envelope.workoutId !== s.workout.workoutId || envelope.workoutRevision > s.workout.revision))) return null
   const node = envelope.pack?.nodes?.[nodeIndex]
   if (!node) return null
+  // Guided setup has no offline transition adapter. Its trial, baseline and
+  // equipment events change the authoritative effective plan, even when the
+  // residual pack still carries the earlier prescription. Never overwrite an
+  // acknowledged setup result by projecting that older plan. Events still queue
+  // durably; working sets remain loggable at their last confirmed targets.
+  if (node.plan?.slots?.some(slot => slot.setup)
+    || (s.workout.effectivePlan || s.workout.plan)?.slots?.some(slot => slot.setup)) return null
   const events = eventsOf(s), basis = nodeIndex === 0 ? envelope.workoutRevision : 0
   const questions = createOfflineQuestions(node.plan, node.targets, node.occurrences)
   for (let i = basis; i < events.length; i++) {
