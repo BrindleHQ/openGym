@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateRelease, environmentConfig, renderCompose, expectedPublic, publicMismatch, address, serviceEnv, buildPlan } from './coolify.mjs';
@@ -15,6 +16,47 @@ const release = {
   api: `ghcr.io/brindlehq/opengym-api@sha256:${digest('1')}`,
   web: `ghcr.io/brindlehq/opengym-web@sha256:${digest('2')}`,
 };
+
+test('Reppen fails closed without a real immutable pin, including direct plan callers', () => {
+  for (const image of [null, '', 'reppen:latest', 'sha256:abc', 'bad\nimage']) {
+    const cfg = { ...environments.staging, reppen: { enabled: true, image } };
+    assert.throws(() => environmentConfig({ staging: cfg }, 'staging'), /immutable/);
+    assert.throws(() => buildPlan(template, 'staging', cfg, release), /immutable/);
+  }
+  assert.throws(() => buildPlan(template, 'staging', { ...environments.staging, reppen: { enabled: 'false' } }, release), /boolean/);
+});
+
+for (const env of ['staging', 'production']) {
+  for (const enabled of [false, true]) {
+    test(`${env}: Reppen ${enabled ? 'enabled' : 'disabled'} compose validates and survives a web release`, () => {
+      const cfg = { ...environments[env], reppen: { enabled, image: `sha256:${digest('3')}` } };
+      const rendered = renderCompose(template, env, cfg, release);
+      // Real Compose parser with empty fixture env files: no host secrets or services.
+      const parse = source => JSON.parse(execFileSync('docker', ['compose', '-p', 'reppen-config-test', '-f', '-', 'config', '--format', 'json'], {
+        input: source.replace(/env_file: \/etc\/opengym\/reppen-(staging|production)\/(postgres|runtime|backup)\.env/g, 'env_file: /dev/null'),
+        env: { ...process.env, CF_CONNECTING_IP: '' }, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+      })).services;
+      const services = parse(rendered);
+      if (!enabled) {
+        assert.deepEqual(Object.keys(services).sort(), ['api', 'backup', 'web']);
+        assert.ok(!Object.keys(services.api.environment).some(e => e.startsWith('REPPEN_')));
+        return;
+      }
+      assert.equal(services.reppen.environment.REPPEN_AUTH_JWKS_URL, 'http://api:3000/api/reppen/jwks');
+      assert.equal(services.api.environment.REPPEN_TOKEN_AUDIENCE, `opengym-${env}`);
+      assert.equal(services.web.environment.REPPEN_BACKEND, 'reppen:8080');
+      assert.equal(services.web.depends_on.reppen.condition, 'service_healthy');
+      for (const name of ['reppen', 'reppen-worker', 'reppen-db', 'reppen-backup']) {
+        assert.equal(services[name].ports, undefined);
+      }
+      assert.equal(services['reppen-db'].volumes[0].source, `/srv/opengym/${env}/reppen/postgres`);
+      assert.equal(services['reppen-db'].volumes[0].target, '/var/lib/postgresql/data');
+      assert.match(rendered, new RegExp(`/etc/opengym/reppen-${env}/runtime.env`));
+      const next = parse(renderCompose(template, env, cfg, { ...release, sha: 'b'.repeat(40), web: `ghcr.io/brindlehq/opengym-web@sha256:${digest('4')}` }));
+      for (const name of ['reppen', 'reppen-worker', 'reppen-db', 'reppen-backup']) assert.deepEqual(next[name], services[name]);
+    });
+  }
+}
 
 test('a release record names both images by digest and the full commit', () => {
   assert.equal(validateRelease(release), release);

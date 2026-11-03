@@ -4,6 +4,9 @@ This is how BrindleHQ/openGym is built, deployed, backed up and released. Upstre
 ([SELF_HOSTING.md](SELF_HOSTING.md) and the rest) still describe the app itself. This file covers
 only our deployment.
 
+Optional Reppen services, protected configuration, PostgreSQL backups and rollback limits are
+documented in [REPPEN_DEPLOY.md](REPPEN_DEPLOY.md).
+
 ## Environments
 
 | | Development | Staging | Production |

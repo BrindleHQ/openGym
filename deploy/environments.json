@@ -8,7 +8,8 @@
     "inviteOnly": true,
     "allowGuest": false,
     "backupCron": "17 3 * * *",
-    "backupRetentionDays": 7
+    "backupRetentionDays": 7,
+    "reppen": { "enabled": false, "image": null }
   },
   "production": {
     "exposure": "tailnet",
@@ -19,6 +20,7 @@
     "inviteOnly": true,
     "allowGuest": false,
     "backupCron": "47 2 * * *",
-    "backupRetentionDays": 30
+    "backupRetentionDays": 30,
+    "reppen": { "enabled": false, "image": null }
   }
 }

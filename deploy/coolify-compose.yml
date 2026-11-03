@@ -6,12 +6,88 @@
 # commit, and nothing is configured by hand in the Coolify UI.
 #
 # openGym keeps its own secrets (session key, VAPID keys) inside the data directory, so the only
-# per-environment state is the two host directories below, created once by deploy/host-setup.sh.
+# baseline per-environment state is the two host directories below. Optional Reppen adds
+# separate PostgreSQL storage/backups and protected env files (docs/REPPEN_DEPLOY.md).
 #
 # The address is __ORIGIN__ (`exposure` in deploy/environments.json). The web container always
 # listens on 127.0.0.1:__LOCAL_PORT__ of Boop Beep, behind `tailscale serve` (host-setup.sh); a
 # public environment also gets a Coolify domain, reached through the Cloudflare tunnel.
 services:
+  # REPPEN_BEGIN
+  reppen-db:
+    image: postgres:17.11@sha256:3b0cda93be7c8dba2ed484d19393d93845dc3dafb88973e248ba8e6d99d784e1
+    restart: unless-stopped
+    env_file: /etc/opengym/reppen-__ENV__/postgres.env
+    environment:
+      POSTGRES_USER: reppen
+      POSTGRES_DB: reppen
+    volumes:
+      - /srv/opengym/__ENV__/reppen/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U reppen -d reppen"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    logging: &reppen-logging
+      driver: json-file
+      options: {max-size: 10m, max-file: "5"}
+
+  reppen:
+    image: __REPPEN_IMAGE__
+    pull_policy: never
+    restart: unless-stopped
+    env_file: /etc/opengym/reppen-__ENV__/runtime.env
+    environment:
+      REPPEN_AUTH_ISSUER: __ORIGIN__
+      REPPEN_AUTH_AUDIENCE: opengym-__ENV__
+      REPPEN_AUTH_JWKS_URL: http://api:3000/api/reppen/jwks
+      REPPEN_ERASURE_ENABLED: "true"
+    depends_on:
+      reppen-db: {condition: service_healthy}
+      api: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, wget, -qO-, "http://127.0.0.1:8080/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    logging: *reppen-logging
+
+  reppen-worker:
+    image: __REPPEN_IMAGE__
+    pull_policy: never
+    command: [reppen-worker]
+    restart: unless-stopped
+    env_file: /etc/opengym/reppen-__ENV__/runtime.env
+    environment:
+      REPPEN_WORKER_POLL_SECONDS: "1"
+    depends_on:
+      reppen: {condition: service_healthy}
+    logging: *reppen-logging
+
+  reppen-backup:
+    image: postgres:17.11@sha256:3b0cda93be7c8dba2ed484d19393d93845dc3dafb88973e248ba8e6d99d784e1
+    restart: unless-stopped
+    init: true
+    entrypoint: ["/bin/sh", "/opt/reppen-backup.sh"]
+    env_file: /etc/opengym/reppen-__ENV__/backup.env
+    environment:
+      PGHOST: reppen-db
+      PGUSER: reppen
+      PGDATABASE: reppen
+      RETENTION_DAYS: "__RETENTION_DAYS__"
+    volumes:
+      - /usr/local/lib/opengym/deploy/reppen-backup.sh:/opt/reppen-backup.sh:ro
+      - /srv/opengym/__ENV__/reppen/backups:/archive
+    depends_on:
+      reppen-db: {condition: service_healthy}
+    healthcheck:
+      test: [CMD-SHELL, "find /archive -name '*.dump' -mmin -1500 | grep -q ."]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    logging: *reppen-logging
+  # REPPEN_END
   api:
     image: __API_IMAGE__
     # No host account has this uid; /srv/opengym/<env>/data is 10001:10001, mode 700. The Coach
@@ -37,6 +113,11 @@ services:
       - VAPID_SUBJECT=__ORIGIN__
       # Only the web container can reach the API, and its nginx overwrites the forwarded headers.
       - TRUST_PROXY=1
+      # REPPEN_BEGIN
+      - REPPEN_TOKEN_ISSUER=__ORIGIN__
+      - REPPEN_TOKEN_AUDIENCE=opengym-__ENV__
+      - REPPEN_API_URL=http://reppen:8080
+      # REPPEN_END
     volumes:
       - /srv/opengym/__ENV__/data:/data
     healthcheck:
@@ -60,12 +141,19 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      # REPPEN_BEGIN
+      reppen:
+        condition: service_healthy
+      # REPPEN_END
     ports:
       - "127.0.0.1:__LOCAL_PORT__:8080"
     environment:
       - NGINX_PORT=8080
       - BACKEND=api
       - PORT=3000
+      # REPPEN_BEGIN
+      - REPPEN_BACKEND=reppen:8080
+      # REPPEN_END
       # Public: the visitor's address from Cloudflare, for the sign-in throttle. Tailnet: empty,
       # which drops the header. Set by the deploy script (serviceEnv in scripts/deploy/coolify.mjs).
       - CF_CONNECTING_IP=${CF_CONNECTING_IP}

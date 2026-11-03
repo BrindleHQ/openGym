@@ -36,6 +36,18 @@ export function validateRelease(release) {
 const isPort = p => Number.isInteger(p) && p >= 1 && p <= 65535;
 const isHost = h => typeof h === 'string' && /^[a-z0-9.-]+$/.test(h);
 
+function reppenConfig(cfg) {
+  const r = cfg.reppen;
+  if (r === undefined) return false;
+  if (typeof r?.enabled !== 'boolean') throw new Error('reppen.enabled must be boolean');
+  if (!r.enabled) return false;
+  // Registry digest or locally loaded Docker image ID; never a mutable tag.
+  if (!/^(?:[a-z0-9][a-z0-9./:_-]*@)?sha256:[0-9a-f]{64}$/.test(r.image || '')) {
+    throw new Error('enabled Reppen requires an immutable reppen.image digest');
+  }
+  return true;
+}
+
 export function environmentConfig(environments, env) {
   const cfg = environments[env];
   if (!cfg) throw new Error(`Unknown environment "${env}" (deploy/environments.json has ${Object.keys(environments).join(', ')})`);
@@ -45,6 +57,7 @@ export function environmentConfig(environments, env) {
   if (!isPort(cfg.localPort)) throw new Error(`${env}: localPort must be a port number`);
   if (!Number.isInteger(cfg.backupRetentionDays) || cfg.backupRetentionDays < 1) throw new Error(`${env}: backupRetentionDays must be a positive integer`);
   if (!/^\S+ \S+ \S+ \S+ \S+$/.test(cfg.backupCron)) throw new Error(`${env}: backupCron must be a five-field cron expression`);
+  reppenConfig(cfg);
   return cfg;
 }
 
@@ -75,6 +88,8 @@ export function address(cfg) {
 export const serviceEnv = where => [{ key: 'CF_CONNECTING_IP', value: where.cfConnectingIp, is_literal: true }];
 
 export function renderCompose(template, env, cfg, release, { bootstrap = false } = {}) {
+  const reppen = reppenConfig(cfg);
+  if (!['staging', 'production'].includes(env)) throw new Error('Unknown deployment environment');
   const flag = v => (v ? '1' : '0');
   const where = address(cfg);
   const values = {
@@ -89,8 +104,9 @@ export function renderCompose(template, env, cfg, release, { bootstrap = false }
     ALLOW_GUEST: flag(cfg.allowGuest),
     BACKUP_CRON: cfg.backupCron,
     RETENTION_DAYS: String(cfg.backupRetentionDays),
+    REPPEN_IMAGE: reppen ? cfg.reppen.image : '',
   };
-  return template.replace(/__([A-Z_]+)__/g, (m, key) => {
+  return template.replace(/^ *# REPPEN_BEGIN\n([\s\S]*?)^ *# REPPEN_END\n/gm, (_, block) => reppen ? block : '').replace(/__([A-Z_]+)__/g, (m, key) => {
     if (!(key in values)) throw new Error(`Unknown placeholder ${m} in deploy/coolify-compose.yml`);
     return values[key];
   });
@@ -177,6 +193,7 @@ export function buildPlan(template, env, cfg, release, { bootstrap = false } = {
     service_env: serviceEnv(where),
     local_port: cfg.localPort,
     expect: expectedPublic(cfg, { bootstrap }),
+    reppen: reppenConfig(cfg),
   };
 }
 
